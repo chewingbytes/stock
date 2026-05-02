@@ -116,6 +116,24 @@ Fields:
 - `source`
 - `fetched_at`
 
+### `market_caps`
+
+Stores provider-supplied or calculated market capitalization snapshots.
+
+Fields:
+
+- `id`
+- `stock_id`
+- `date`
+- `market_cap`
+- `currency`
+- `source`
+- `calculation_method`
+- `fetched_at`
+
+`calculation_method` should distinguish provider-supplied market cap from app
+calculated market cap.
+
 ### `derived_metrics`
 
 Stores calculated metrics used by the screener.
