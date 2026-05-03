@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CriteriaSummary } from "../components/CriteriaSummary";
 import { ExportButton } from "../components/ExportButton";
 import { FilterBuilder } from "../components/FilterBuilder";
@@ -36,6 +36,11 @@ export default function HomePage() {
   const [result, setResult] = useState<ScreenResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    setReady(true);
+  }, []);
 
   const metricKeys = useMemo(
     () => filters.map((filter) => filter.metricKey),
@@ -86,7 +91,7 @@ export default function HomePage() {
             className="primary"
             type="button"
             onClick={runScreen}
-            disabled={loading || markets.length === 0}
+            disabled={!ready || loading || markets.length === 0}
           >
             {loading ? "Running..." : "Run Screen"}
           </button>
