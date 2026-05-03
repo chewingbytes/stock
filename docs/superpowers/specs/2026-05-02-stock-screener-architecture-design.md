@@ -32,6 +32,66 @@ This approach fits the agreed constraints because it:
 - Lets students inspect and debug the stored data.
 - Keeps the app replaceable if the first data provider is not good enough.
 
+## Architecture Diagram
+
+```mermaid
+flowchart TB
+  user[User]
+  frontend[Frontend Screener Workspace]
+  screenApi[Screener API]
+  exportApi[CSV Export API]
+
+  subgraph ingestion[Batch Ingestion Layer]
+    scheduler[Manual Or Scheduled Jobs]
+    adapters[Provider Adapters]
+    csv[CSV Import Adapter]
+  end
+
+  subgraph providers[External Or Imported Data Sources]
+    eodhd[EODHD]
+    marketstack[Marketstack]
+    twelvedata[Twelve Data]
+    fmp[Financial Modeling Prep]
+    csvFiles[CSV Files]
+  end
+
+  subgraph db[Local Data Hub]
+    raw[(Raw Fact Tables)]
+    metrics[(Derived Metrics)]
+    runs[(Screen Runs)]
+  end
+
+  formula[Metric Calculation Layer]
+
+  user --> frontend
+  frontend --> screenApi
+  frontend --> exportApi
+
+  screenApi --> metrics
+  screenApi --> raw
+  screenApi --> runs
+  exportApi --> screenApi
+
+  scheduler --> adapters
+  scheduler --> csv
+  eodhd --> adapters
+  marketstack --> adapters
+  twelvedata --> adapters
+  fmp --> adapters
+  csvFiles --> csv
+
+  adapters --> raw
+  csv --> raw
+  raw --> formula
+  formula --> metrics
+```
+
+The key architectural rule is that user screening reads from the local data hub.
+The UI should not call EODHD, Marketstack, Twelve Data, Financial Modeling Prep,
+or any future provider directly. External data enters through adapters,
+normalizes into raw fact tables, and then becomes derived metrics through the
+formula layer.
+
 ## Architecture Components
 
 ### Data Provider Adapters
