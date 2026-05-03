@@ -1,0 +1,11 @@
+stockCode,fiscalYear,dividendPerShare,currency,source
+AAPL,2024,0.96,USD,fixture
+AAPL,2025,1.00,USD,fixture
+MSFT,2024,3.00,USD,fixture
+MSFT,2025,3.32,USD,fixture
+LOSS,2024,0,USD,fixture
+LOSS,2025,0,USD,fixture
+D05,2024,2.16,SGD,fixture
+D05,2025,2.40,SGD,fixture
+Z74,2024,0.15,SGD,fixture
+Z74,2025,0.16,SGD,fixture

@@ -1,0 +1,7 @@
+marketCode,exchange,stockCode,stockName,currency,sector,industry,providerSymbol,isActive
+US,NASDAQ,AAPL,Apple Inc.,USD,Technology,Consumer Electronics,AAPL,true
+US,NASDAQ,MSFT,Microsoft Corporation,USD,Technology,Software,MSFT,true
+US,NASDAQ,LOSS,Loss Making Sample Inc.,USD,Industrials,Testing,LOSS,true
+SGX,SGX,D05,DBS Group Holdings Ltd,SGD,Financials,Banks,D05.SI,true
+SGX,SGX,Z74,Singapore Telecommunications Ltd,SGD,Communication Services,Telecom,Z74.SI,true
+SGX,SGX,MISS,Missing Fundamentals Sample Ltd,SGD,Industrials,Testing,MISS.SI,true
