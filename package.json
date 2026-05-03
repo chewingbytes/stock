@@ -1,0 +1,41 @@
+{
+  "name": "stock-screener",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "tsx prisma/seed.ts",
+    "import:fixtures": "tsx src/server/import/runFixtureImport.ts",
+    "metrics:recompute": "tsx src/server/metrics/runRecomputeMetrics.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "latest",
+    "csv-parse": "latest",
+    "next": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@playwright/test": "latest",
+    "@testing-library/jest-dom": "latest",
+    "@testing-library/react": "latest",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@vitejs/plugin-react": "latest",
+    "jsdom": "latest",
+    "prisma": "latest",
+    "tsx": "latest",
+    "typescript": "latest",
+    "vitest": "latest"
+  }
+}
