@@ -7,3 +7,4 @@ test-results/
 .env
 *.db
 *.db-journal
+*.log
