@@ -17,7 +17,7 @@
     "metrics:recompute": "tsx src/server/metrics/runRecomputeMetrics.ts"
   },
   "dependencies": {
-    "@prisma/client": "latest",
+    "@prisma/client": "^6.19.3",
     "csv-parse": "latest",
     "next": "latest",
     "react": "latest",
@@ -33,7 +33,7 @@
     "@types/react-dom": "latest",
     "@vitejs/plugin-react": "latest",
     "jsdom": "latest",
-    "prisma": "latest",
+    "prisma": "^6.19.3",
     "tsx": "latest",
     "typescript": "latest",
     "vitest": "latest"

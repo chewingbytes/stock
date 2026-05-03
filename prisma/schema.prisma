@@ -1,0 +1,139 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Market {
+  id       Int     @id @default(autoincrement())
+  code     String  @unique
+  name     String
+  country  String
+  currency String
+  timezone String
+  status   String
+  stocks   Stock[]
+}
+
+model Stock {
+  id             Int              @id @default(autoincrement())
+  marketId       Int
+  market         Market           @relation(fields: [marketId], references: [id])
+  exchange       String
+  stockCode      String
+  stockName      String
+  currency       String
+  sector         String?
+  industry       String?
+  providerSymbol String
+  isActive       Boolean          @default(true)
+  dailyPrices    DailyPrice[]
+  financials     AnnualFinancial[]
+  dividends      AnnualDividend[]
+  marketCaps     MarketCap[]
+  derivedMetrics DerivedMetric[]
+
+  @@unique([marketId, stockCode])
+}
+
+model DailyPrice {
+  id            Int      @id @default(autoincrement())
+  stockId       Int
+  stock         Stock    @relation(fields: [stockId], references: [id])
+  date          DateTime
+  open          Decimal
+  high          Decimal
+  low           Decimal
+  close         Decimal
+  adjustedClose Decimal?
+  volume        Decimal?
+  source        String
+  fetchedAt     DateTime
+
+  @@unique([stockId, date])
+}
+
+model AnnualFinancial {
+  id                Int      @id @default(autoincrement())
+  stockId           Int
+  stock             Stock    @relation(fields: [stockId], references: [id])
+  fiscalYear        Int
+  revenue           Decimal?
+  profitBeforeTax   Decimal?
+  profitAfterTax    Decimal?
+  ebita             Decimal?
+  totalDebt         Decimal?
+  totalEquity       Decimal?
+  sharesOutstanding Decimal?
+  earningsPerShare  Decimal?
+  bookValuePerShare Decimal?
+  source            String
+  fetchedAt         DateTime
+
+  @@unique([stockId, fiscalYear])
+}
+
+model AnnualDividend {
+  id               Int      @id @default(autoincrement())
+  stockId          Int
+  stock            Stock    @relation(fields: [stockId], references: [id])
+  fiscalYear       Int
+  dividendPerShare Decimal?
+  currency         String
+  source           String
+  fetchedAt        DateTime
+
+  @@unique([stockId, fiscalYear])
+}
+
+model MarketCap {
+  id                Int      @id @default(autoincrement())
+  stockId           Int
+  stock             Stock    @relation(fields: [stockId], references: [id])
+  date              DateTime
+  marketCap         Decimal
+  currency          String
+  source            String
+  calculationMethod String
+  fetchedAt         DateTime
+
+  @@unique([stockId, date, source])
+}
+
+model DerivedMetric {
+  id             Int       @id @default(autoincrement())
+  stockId        Int
+  stock          Stock     @relation(fields: [stockId], references: [id])
+  metricKey      String
+  metricDate     DateTime?
+  fiscalYear     Int?
+  value          Decimal?
+  currency       String?
+  formulaVersion String
+  inputSnapshot  String
+  dataQuality    String
+  reason         String?
+
+  @@unique([stockId, metricKey, formulaVersion])
+}
+
+model ScreenRun {
+  id              Int      @id @default(autoincrement())
+  createdAt       DateTime @default(now())
+  selectedMarkets String
+  filtersJson     String
+  resultCount     Int
+}
+
+model ImportRun {
+  id          Int       @id @default(autoincrement())
+  source      String
+  importType  String
+  status      String
+  startedAt   DateTime
+  completedAt DateTime?
+  message     String?
+}
