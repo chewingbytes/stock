@@ -131,6 +131,11 @@ select:focus-visible {
   margin-bottom: 14px;
 }
 
+.filter-builder .panel-title {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
 .panel-title h2 {
   margin-bottom: 0;
 }
@@ -143,6 +148,10 @@ select:focus-visible {
   color: var(--text);
   padding: 8px 10px;
   font-size: 14px;
+}
+
+.filter-builder .secondary-button {
+  width: fit-content;
 }
 
 .metric-card-grid {
@@ -185,7 +194,7 @@ select:focus-visible {
 
 .filter-row {
   display: grid;
-  grid-template-columns: minmax(110px, 1.2fr) minmax(72px, 0.8fr) minmax(72px, 0.8fr) auto;
+  grid-template-columns: minmax(120px, 1fr) 72px 72px;
   gap: 8px;
   align-items: center;
 }
@@ -201,6 +210,7 @@ select:focus-visible {
 }
 
 .filter-row button {
+  grid-column: 1 / -1;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--surface-muted);

@@ -43,6 +43,7 @@ export default function HomePage() {
     { metricKey: "pe_ratio", min: 1, max: 40 },
   ]);
   const [result, setResult] = useState<ScreenResult | null>(null);
+  const [universeResult, setUniverseResult] = useState<ScreenResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
@@ -73,31 +74,47 @@ export default function HomePage() {
     );
   }, [result, selectedRowKey]);
 
+  const fetchScreen = useCallback(
+    async (screenFilters: RangeFilter[]) => {
+      const response = await fetch("/api/screen", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          markets,
+          filters: screenFilters,
+          sort: { metricKey: "stock_code", direction: "asc" },
+          page: 1,
+          pageSize: 50,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Screen failed.");
+      }
+
+      return (await response.json()) as ScreenResult;
+    },
+    [markets],
+  );
+
   const runScreen = useCallback(async () => {
     setLoading(true);
     setError(null);
 
-    const response = await fetch("/api/screen", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        markets,
-        filters,
-        sort: { metricKey: "stock_code", direction: "asc" },
-        page: 1,
-        pageSize: 50,
-      }),
-    });
+    try {
+      const [screenResult, stockUniverse] = await Promise.all([
+        fetchScreen(filters),
+        fetchScreen([]),
+      ]);
 
-    setLoading(false);
-
-    if (!response.ok) {
+      setResult(screenResult);
+      setUniverseResult(stockUniverse);
+    } catch {
       setError("Screen failed. Check filter values and try again.");
-      return;
+    } finally {
+      setLoading(false);
     }
-
-    setResult((await response.json()) as ScreenResult);
-  }, [filters, markets]);
+  }, [fetchScreen, filters]);
 
   useEffect(() => {
     if (!ready || initialScreenRan.current) {
@@ -169,7 +186,11 @@ export default function HomePage() {
               }
               metricKeys={activeTab === "universe" ? [] : metricKeys}
               onSelectRow={setSelectedRowKey}
-              rows={result?.rows ?? []}
+              rows={
+                activeTab === "universe"
+                  ? (universeResult?.rows ?? [])
+                  : (result?.rows ?? [])
+              }
               selectedRowKey={selectedRowKey}
               title={activeTab === "universe" ? "Stock Universe" : "Results"}
             />
