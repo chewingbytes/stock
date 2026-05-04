@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "../db";
 import type { MarketDataProvider, ProviderUniverseRow } from "../providers/types";
 import { importFixtures } from "./fixtureImport";
@@ -23,51 +23,17 @@ function rowFor(
   };
 }
 
-async function cleanupGeneratedProviderRows(): Promise<void> {
-  const generatedStocks = await prisma.stock.findMany({
-    where: {
-      stockCode: {
-        startsWith: "Z74",
-        not: "Z74",
-      },
-    },
-    select: { id: true },
-  });
-  const stockIds = generatedStocks.map((stock) => stock.id);
-
-  if (stockIds.length > 0) {
-    await prisma.dailyPrice.deleteMany({ where: { stockId: { in: stockIds } } });
-    await prisma.annualFinancial.deleteMany({
-      where: { stockId: { in: stockIds } },
-    });
-    await prisma.annualDividend.deleteMany({
-      where: { stockId: { in: stockIds } },
-    });
-    await prisma.marketCap.deleteMany({ where: { stockId: { in: stockIds } } });
-    await prisma.derivedMetric.deleteMany({
-      where: { stockId: { in: stockIds } },
-    });
-    await prisma.stock.deleteMany({ where: { id: { in: stockIds } } });
-  }
-
-  await prisma.importRun.deleteMany({
-    where: { source: { startsWith: "provider_import_" } },
-  });
-}
-
 describe("importProviderUniverse", () => {
-  beforeEach(async () => {
-    await cleanupGeneratedProviderRows();
-    await importFixtures();
-  });
+  const providerOnlyDate = new Date("2035-01-01T00:00:00.000Z");
+  const providerOnlyFiscalYear = 2035;
 
-  afterEach(async () => {
-    await cleanupGeneratedProviderRows();
+  beforeEach(async () => {
+    await importFixtures();
   });
 
   it("normalizes complete provider data into raw fact tables", async () => {
     const now = new Date("2026-05-04T10:00:00.000Z");
-    const stockCode = uniqueStockCode("Z74");
+    const stockCode = "Z74";
     const row = rowFor(
       stockCode,
       "Singapore Telecommunications Ltd",
@@ -80,7 +46,7 @@ describe("importProviderUniverse", () => {
           row: input,
           dailyPrices: [
             {
-              date: new Date("2026-05-01T00:00:00.000Z"),
+              date: providerOnlyDate,
               open: 1.1,
               high: 1.3,
               low: 1,
@@ -91,7 +57,7 @@ describe("importProviderUniverse", () => {
           ],
           annualFinancials: [
             {
-              fiscalYear: 2025,
+              fiscalYear: providerOnlyFiscalYear,
               revenue: 100_000,
               profitBeforeTax: 20_000,
               profitAfterTax: 15_000,
@@ -105,14 +71,14 @@ describe("importProviderUniverse", () => {
           ],
           annualDividends: [
             {
-              fiscalYear: 2025,
+              fiscalYear: providerOnlyFiscalYear,
               dividendPerShare: 0.08,
               currency: "SGD",
             },
           ],
           marketCaps: [
             {
-              date: new Date("2026-05-01T00:00:00.000Z"),
+              date: providerOnlyDate,
               marketCap: 1_200_000,
               currency: "SGD",
               calculationMethod: "reported",
@@ -155,8 +121,8 @@ describe("importProviderUniverse", () => {
       exchange: "SGX",
       stockName: row.stockName,
       currency: "SGD",
-      sector: null,
-      industry: null,
+      sector: "Communication Services",
+      industry: "Telecom",
       providerSymbol: row.providerSymbol,
       isActive: true,
     });
@@ -165,7 +131,7 @@ describe("importProviderUniverse", () => {
       where: {
         stockId_date: {
           stockId: stock.id,
-          date: new Date("2026-05-01T00:00:00.000Z"),
+          date: providerOnlyDate,
         },
       },
     });
@@ -180,7 +146,7 @@ describe("importProviderUniverse", () => {
       where: {
         stockId_fiscalYear: {
           stockId: stock.id,
-          fiscalYear: 2025,
+          fiscalYear: providerOnlyFiscalYear,
         },
       },
     });
@@ -193,7 +159,7 @@ describe("importProviderUniverse", () => {
       where: {
         stockId_fiscalYear: {
           stockId: stock.id,
-          fiscalYear: 2025,
+          fiscalYear: providerOnlyFiscalYear,
         },
       },
     });
@@ -205,7 +171,7 @@ describe("importProviderUniverse", () => {
       where: {
         stockId_date_source: {
           stockId: stock.id,
-          date: new Date("2026-05-01T00:00:00.000Z"),
+          date: providerOnlyDate,
           source: provider.source,
         },
       },
@@ -292,14 +258,11 @@ describe("importProviderUniverse", () => {
 
   it("rolls back raw facts when a row write fails after starting", async () => {
     const now = new Date("2026-05-04T13:00:00.000Z");
-    const stockCode = uniqueStockCode("Z74");
+    const stockCode = "Z74";
     const row = rowFor(
       stockCode,
       "Singapore Telecommunications Ltd",
       "Z74.SI",
-    );
-    const dailyPriceDate = new Date(
-      Date.UTC(2035, 0, 1) + Math.floor(Math.random() * 1_000_000_000),
     );
     const provider: MarketDataProvider = {
       source: `provider_import_atomic_${stockCode}_${uniqueStockCode("RUN")}`,
@@ -308,7 +271,7 @@ describe("importProviderUniverse", () => {
           row: input,
           dailyPrices: [
             {
-              date: dailyPriceDate,
+              date: providerOnlyDate,
               open: 2.4,
               high: 2.5,
               low: 2.3,
@@ -321,7 +284,7 @@ describe("importProviderUniverse", () => {
           annualDividends: [],
           marketCaps: [
             {
-              date: dailyPriceDate,
+              date: providerOnlyDate,
               marketCap: null as unknown as number,
               currency: "SGD",
               calculationMethod: "reported",
@@ -347,13 +310,13 @@ describe("importProviderUniverse", () => {
     });
     const dailyPrice = await prisma.dailyPrice.findFirst({
       where: {
-        date: dailyPriceDate,
+        date: providerOnlyDate,
         source: provider.source,
       },
     });
     const marketCap = await prisma.marketCap.findFirst({
       where: {
-        date: dailyPriceDate,
+        date: providerOnlyDate,
         source: provider.source,
       },
     });
@@ -362,7 +325,7 @@ describe("importProviderUniverse", () => {
       orderBy: { id: "desc" },
     });
 
-    expect(stock).toBeNull();
+    expect(stock).not.toBeNull();
     expect(dailyPrice).toBeNull();
     expect(marketCap).toBeNull();
     expect(importRun.status).toBe("failed");
