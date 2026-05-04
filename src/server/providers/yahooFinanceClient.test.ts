@@ -15,6 +15,27 @@ const row: ProviderUniverseRow = {
 };
 
 describe("createYahooFinanceProvider", () => {
+  it("creates a Yahoo client on the default path before fetching", async () => {
+    const yahoo: YahooFinanceClient = {
+      historical: vi.fn().mockResolvedValue([]),
+      quote: vi.fn().mockResolvedValue({}),
+      quoteSummary: vi.fn().mockResolvedValue({}),
+    };
+    const createYahoo = vi.fn(() => yahoo);
+    const provider = createYahooFinanceProvider({
+      createYahoo,
+      now: () => new Date("2026-05-04T12:00:00.000Z"),
+    });
+
+    await provider.fetchStock(row);
+
+    expect(createYahoo).toHaveBeenCalledTimes(1);
+    expect(yahoo.historical).toHaveBeenCalledWith("AAPL", {
+      period1: new Date("2025-05-04T12:00:00.000Z"),
+      interval: "1d",
+    });
+  });
+
   it("maps Yahoo historical, quote, and quoteSummary data to provider-neutral stock data", async () => {
     const now = new Date("2026-05-04T12:00:00.000Z");
     const yahoo: YahooFinanceClient = {

@@ -1,4 +1,4 @@
-import yahooFinance from "yahoo-finance2";
+import YahooFinance from "yahoo-finance2";
 import type {
   MarketDataProvider,
   ProviderAnnualFinancial,
@@ -76,6 +76,7 @@ export type YahooFinanceClient = {
 
 type YahooFinanceProviderDeps = {
   yahoo?: YahooFinanceClient;
+  createYahoo?: () => YahooFinanceClient;
   now?: () => Date;
 };
 
@@ -187,7 +188,7 @@ function mapMarketCap(quote: YahooQuote, now: Date, fallbackCurrency: string) {
 export function createYahooFinanceProvider(
   deps: YahooFinanceProviderDeps = {},
 ): MarketDataProvider {
-  const yahoo = deps.yahoo ?? yahooFinance;
+  const yahoo = deps.yahoo ?? deps.createYahoo?.() ?? new YahooFinance();
   const getNow = deps.now ?? (() => new Date());
 
   return {
