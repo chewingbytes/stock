@@ -1,17 +1,14 @@
-import type { RangeFilter } from "../domain/types";
+import { beginnerMetricDefinitions } from "../domain/metricDefinitions";
+import type { MetricKey, RangeFilter } from "../domain/types";
 
-const availableFilters: { metricKey: RangeFilter["metricKey"]; label: string }[] =
-  [
-    { metricKey: "market_cap", label: "Market Cap" },
-    { metricKey: "revenue_growth_rate", label: "Revenue Growth" },
-    { metricKey: "profit_growth_rate", label: "Profit Growth" },
-    { metricKey: "dividend_yield", label: "Dividend Yield" },
-    { metricKey: "dividend_growth_rate", label: "Dividend Growth" },
-    { metricKey: "pe_ratio", label: "P/E" },
-    { metricKey: "pb_ratio", label: "P/B" },
-    { metricKey: "debt_to_equity_ratio", label: "Debt To Equity" },
-    { metricKey: "close", label: "Close Price" },
-  ];
+const starterMetrics: MetricKey[] = [
+  "pe_ratio",
+  "dividend_yield",
+  "revenue_growth_rate",
+  "debt_to_equity_ratio",
+];
+
+const availableFilters = Object.values(beginnerMetricDefinitions);
 
 export function FilterBuilder({
   filters,
@@ -29,7 +26,20 @@ export function FilterBuilder({
   }
 
   function addFilter() {
-    onChange([...filters, { metricKey: "pe_ratio", min: null, max: null }]);
+    addMetric("pe_ratio");
+  }
+
+  function addMetric(metricKey: MetricKey) {
+    const definition = beginnerMetricDefinitions[metricKey];
+
+    onChange([
+      ...filters,
+      {
+        metricKey,
+        min: definition.defaultRange.min,
+        max: definition.defaultRange.max,
+      },
+    ]);
   }
 
   function removeFilter(index: number) {
@@ -37,13 +47,37 @@ export function FilterBuilder({
   }
 
   return (
-    <section className="panel">
+    <section className="panel filter-builder">
       <div className="panel-title">
-        <h2>Filters</h2>
-        <button type="button" onClick={addFilter}>
+        <div>
+          <p className="eyebrow">Beginner filters</p>
+          <h2>Build your screen</h2>
+        </div>
+        <button className="secondary-button" type="button" onClick={addFilter}>
           Add Filter
         </button>
       </div>
+
+      <div className="metric-card-grid" aria-label="Beginner metric library">
+        {starterMetrics.map((metricKey) => {
+          const definition = beginnerMetricDefinitions[metricKey];
+          const isActive = filters.some((filter) => filter.metricKey === metricKey);
+
+          return (
+            <button
+              className={isActive ? "metric-card active" : "metric-card"}
+              disabled={isActive}
+              key={metricKey}
+              onClick={() => addMetric(metricKey)}
+              type="button"
+            >
+              <span>{definition.label}</span>
+              <small>{definition.explanation}</small>
+            </button>
+          );
+        })}
+      </div>
+
       <div className="filter-list">
         {filters.map((filter, index) => (
           <div className="filter-row" key={`${filter.metricKey}-${index}`}>

@@ -1,3 +1,4 @@
+import { formatMetricLabel } from "../domain/metricDefinitions";
 import type { RangeFilter } from "../domain/types";
 
 export function CriteriaSummary({
@@ -14,8 +15,8 @@ export function CriteriaSummary({
       <ul>
         {filters.map((filter, index) => (
           <li key={`${filter.metricKey}-${index}`}>
-            {filter.metricKey}: {filter.min ?? "no min"} to{" "}
-            {filter.max ?? "no max"}
+            {formatMetricLabel(filter.metricKey)}: {filter.min ?? "Any"} to{" "}
+            {filter.max ?? "Any"}
           </li>
         ))}
       </ul>

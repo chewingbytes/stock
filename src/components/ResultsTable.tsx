@@ -1,4 +1,6 @@
 import { DataQualityBadge } from "./DataQualityBadge";
+import { formatMetricLabel } from "../domain/metricDefinitions";
+import type { MetricKey } from "../domain/types";
 
 type ScreenMetricValue = {
   value: number | null;
@@ -19,9 +21,15 @@ type ScreenRow = {
 export function ResultsTable({
   rows,
   metricKeys,
+  selectedRowKey = null,
+  onSelectRow,
+  emptyMessage = "Run a screen to see matching stocks.",
 }: {
   rows: ScreenRow[];
-  metricKeys: string[];
+  metricKeys: MetricKey[];
+  selectedRowKey?: string | null;
+  onSelectRow?: (rowKey: string) => void;
+  emptyMessage?: string;
 }) {
   return (
     <section className="panel table-panel">
@@ -33,39 +41,55 @@ export function ResultsTable({
               <th>Market</th>
               <th>Exchange</th>
               <th>Code</th>
-              <th>Name</th>
+              <th>Company</th>
               <th>Currency</th>
               {metricKeys.map((key) => (
-                <th key={key}>{key}</th>
+                <th key={key}>{formatMetricLabel(key)}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
-              <tr key={`${row.marketCode}-${row.stockCode}`}>
-                <td>{row.marketCode}</td>
-                <td>{row.exchange}</td>
-                <td>{row.stockCode}</td>
-                <td>{row.stockName}</td>
-                <td>{row.currency}</td>
-                {metricKeys.map((key) => {
-                  const metric = row.metrics[key];
-
-                  return (
-                    <td key={key}>
-                      {metric?.value === null || metric?.value === undefined
-                        ? "N/A"
-                        : metric.value.toLocaleString()}
-                      {metric ? (
-                        <DataQualityBadge status={metric.dataQuality} />
-                      ) : (
-                        <DataQualityBadge status="missing" />
-                      )}
-                    </td>
-                  );
-                })}
+            {rows.length === 0 ? (
+              <tr>
+                <td className="empty-cell" colSpan={5 + metricKeys.length}>
+                  {emptyMessage}
+                </td>
               </tr>
-            ))}
+            ) : (
+              rows.map((row) => {
+                const rowKey = `${row.marketCode}-${row.stockCode}`;
+
+                return (
+                  <tr
+                    className={selectedRowKey === rowKey ? "selected" : ""}
+                    key={rowKey}
+                    onClick={() => onSelectRow?.(rowKey)}
+                  >
+                    <td>{row.marketCode}</td>
+                    <td>{row.exchange}</td>
+                    <td>{row.stockCode}</td>
+                    <td>{row.stockName}</td>
+                    <td>{row.currency}</td>
+                    {metricKeys.map((key) => {
+                      const metric = row.metrics[key];
+
+                      return (
+                        <td key={key}>
+                          {metric?.value === null || metric?.value === undefined
+                            ? "N/A"
+                            : metric.value.toLocaleString()}
+                          {metric ? (
+                            <DataQualityBadge status={metric.dataQuality} />
+                          ) : (
+                            <DataQualityBadge status="missing" />
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
       </div>
