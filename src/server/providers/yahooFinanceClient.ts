@@ -64,7 +64,7 @@ export type YahooFinanceClient = {
   quoteSummary(
     symbol: string,
     options: {
-      modules: [
+      modules: readonly [
         "incomeStatementHistory",
         "balanceSheetHistory",
         "defaultKeyStatistics",
@@ -81,11 +81,27 @@ type YahooFinanceProviderDeps = {
 };
 
 const quoteSummaryModules = [
+  // Yahoo Finance 3.14 warns these statement modules may have sparse data.
+  // Missing mapped statements are surfaced as no_annual_financials warnings.
   "incomeStatementHistory",
   "balanceSheetHistory",
   "defaultKeyStatistics",
   "summaryDetail",
 ] as const;
+
+function createDefaultYahooClient(): YahooFinanceClient {
+  const client = new YahooFinance();
+
+  return {
+    historical: async (symbol, options) =>
+      (await client.historical(symbol, options)) as YahooHistoricalRow[],
+    quote: async (symbol) => (await client.quote(symbol)) as YahooQuote,
+    quoteSummary: async (symbol, options) =>
+      (await client.quoteSummary(symbol, {
+        modules: [...options.modules],
+      })) as YahooQuoteSummary,
+  };
+}
 
 function finiteNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -188,7 +204,8 @@ function mapMarketCap(quote: YahooQuote, now: Date, fallbackCurrency: string) {
 export function createYahooFinanceProvider(
   deps: YahooFinanceProviderDeps = {},
 ): MarketDataProvider {
-  const yahoo = deps.yahoo ?? deps.createYahoo?.() ?? new YahooFinance();
+  const yahoo: YahooFinanceClient =
+    deps.yahoo ?? deps.createYahoo?.() ?? createDefaultYahooClient();
   const getNow = deps.now ?? (() => new Date());
 
   return {
