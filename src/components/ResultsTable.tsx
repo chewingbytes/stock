@@ -24,16 +24,18 @@ export function ResultsTable({
   selectedRowKey = null,
   onSelectRow,
   emptyMessage = "Run a screen to see matching stocks.",
+  title = "Results",
 }: {
   rows: ScreenRow[];
   metricKeys: MetricKey[];
   selectedRowKey?: string | null;
   onSelectRow?: (rowKey: string) => void;
   emptyMessage?: string;
+  title?: string;
 }) {
   return (
     <section className="panel table-panel">
-      <h2>Results</h2>
+      <h2>{title}</h2>
       <div className="table-scroll">
         <table>
           <thead>

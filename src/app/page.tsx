@@ -1,14 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CriteriaSummary } from "../components/CriteriaSummary";
 import { ExportButton } from "../components/ExportButton";
 import { FilterBuilder } from "../components/FilterBuilder";
 import { MarketSelector } from "../components/MarketSelector";
+import { MetricLearningPanel } from "../components/MetricLearningPanel";
 import { ResultsTable } from "../components/ResultsTable";
-import type { RangeFilter } from "../domain/types";
+import { RowExplanation } from "../components/RowExplanation";
+import { ScreenTabs, type ScreenTab } from "../components/ScreenTabs";
+import { UniverseSummary } from "../components/UniverseSummary";
+import type { MetricKey, RangeFilter } from "../domain/types";
 
 type ScreenResult = {
+  criteria: RangeFilter[];
+  universeTotal: number;
+  filteredOut: number;
+  page: number;
+  pageSize: number;
   rows: Array<{
     marketCode: string;
     exchange: string;
@@ -37,6 +46,11 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
+  const [activeTab, setActiveTab] = useState<ScreenTab>("results");
+  const [selectedMetricKey, setSelectedMetricKey] =
+    useState<MetricKey>("pe_ratio");
+  const [selectedRowKey, setSelectedRowKey] = useState<string | null>(null);
+  const initialScreenRan = useRef(false);
 
   useEffect(() => {
     setReady(true);
@@ -47,7 +61,19 @@ export default function HomePage() {
     [filters],
   );
 
-  async function runScreen() {
+  const selectedRow = useMemo(() => {
+    if (!selectedRowKey || !result) {
+      return null;
+    }
+
+    return (
+      result.rows.find(
+        (row) => `${row.marketCode}-${row.stockCode}` === selectedRowKey,
+      ) ?? null
+    );
+  }, [result, selectedRowKey]);
+
+  const runScreen = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -71,7 +97,20 @@ export default function HomePage() {
     }
 
     setResult((await response.json()) as ScreenResult);
-  }
+  }, [filters, markets]);
+
+  useEffect(() => {
+    if (!ready || initialScreenRan.current) {
+      return;
+    }
+
+    initialScreenRan.current = true;
+    void runScreen();
+  }, [ready, runScreen]);
+
+  useEffect(() => {
+    setSelectedMetricKey(filters[0]?.metricKey ?? "pe_ratio");
+  }, [filters]);
 
   return (
     <main className="app-shell">
@@ -99,13 +138,49 @@ export default function HomePage() {
         </aside>
 
         <section className="content">
+          <UniverseSummary
+            filteredOut={result?.filteredOut ?? 0}
+            matched={result?.total ?? 0}
+            markets={markets}
+            universeTotal={result?.universeTotal ?? 0}
+          />
+          <ScreenTabs activeTab={activeTab} onChange={setActiveTab} />
           <CriteriaSummary markets={markets} filters={filters} />
           <p className="disclaimer">
             Screening results are research candidates, not financial advice.
             Data may be delayed, missing, or imported from CSV.
           </p>
-          <ResultsTable rows={result?.rows ?? []} metricKeys={metricKeys} />
+          {activeTab === "learn" ? (
+            <section className="panel learn-tab-panel">
+              <h2>Learn</h2>
+              <p>
+                Choose a metric card to learn what it means before using it to
+                narrow the stock universe.
+              </p>
+            </section>
+          ) : (
+            <ResultsTable
+              emptyMessage={
+                loading
+                  ? "Loading matching stocks..."
+                  : activeTab === "universe"
+                    ? "No stocks are available for the selected markets."
+                    : "No stocks matched these ranges. Try widening one filter."
+              }
+              metricKeys={activeTab === "universe" ? [] : metricKeys}
+              onSelectRow={setSelectedRowKey}
+              rows={result?.rows ?? []}
+              selectedRowKey={selectedRowKey}
+              title={activeTab === "universe" ? "Stock Universe" : "Results"}
+            />
+          )}
+          <RowExplanation
+            filters={filters}
+            stockName={selectedRow?.stockName ?? null}
+          />
         </section>
+
+        <MetricLearningPanel metricKey={selectedMetricKey} />
       </div>
     </main>
   );
