@@ -1,0 +1,4 @@
+marketCode,exchange,stockCode,stockName,currency,providerSymbol
+US,NASDAQ,AAPL,Apple Inc,USD,AAPL
+US,NASDAQ,MSFT,Microsoft Corporation,USD,MSFT
+US,NASDAQ,NVDA,NVIDIA Corporation,USD,NVDA
