@@ -14,6 +14,7 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
     "import:fixtures": "tsx src/server/import/runFixtureImport.ts",
+    "import:yahoo": "tsx src/server/import/runYahooFinanceImport.ts",
     "metrics:recompute": "tsx src/server/metrics/runRecomputeMetrics.ts"
   },
   "dependencies": {
@@ -22,6 +23,7 @@
     "next": "latest",
     "react": "latest",
     "react-dom": "latest",
+    "yahoo-finance2": "^3.14.0",
     "zod": "latest"
   },
   "devDependencies": {
