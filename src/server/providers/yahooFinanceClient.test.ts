@@ -151,6 +151,67 @@ describe("createYahooFinanceProvider", () => {
     });
   });
 
+  it("does not merge balance sheet values from a different fiscal year", async () => {
+    const yahoo: YahooFinanceClient = {
+      historical: vi.fn().mockResolvedValue([
+        {
+          date: new Date("2026-05-01T00:00:00.000Z"),
+          open: 170,
+          high: 173,
+          low: 169,
+          close: 172,
+        },
+      ]),
+      quote: vi.fn().mockResolvedValue({}),
+      quoteSummary: vi.fn().mockResolvedValue({
+        incomeStatementHistory: {
+          incomeStatementHistory: [
+            {
+              endDate: new Date("2025-09-30T00:00:00.000Z"),
+              totalRevenue: 410_000_000_000,
+              incomeBeforeTax: 123_000_000_000,
+              netIncome: 102_000_000_000,
+              ebit: 115_000_000_000,
+            },
+          ],
+        },
+        balanceSheetHistory: {
+          balanceSheetStatements: [
+            {
+              endDate: new Date("2024-09-30T00:00:00.000Z"),
+              totalDebt: 90_000_000_000,
+              totalStockholderEquity: 72_000_000_000,
+            },
+          ],
+        },
+        defaultKeyStatistics: {},
+        summaryDetail: {},
+      }),
+    };
+
+    const provider = createYahooFinanceProvider({
+      yahoo,
+      now: () => new Date("2026-05-04T12:00:00.000Z"),
+    });
+
+    const data = await provider.fetchStock(row);
+
+    expect(data.annualFinancials).toEqual([
+      {
+        fiscalYear: 2025,
+        revenue: 410_000_000_000,
+        profitBeforeTax: 123_000_000_000,
+        profitAfterTax: 102_000_000_000,
+        ebita: 115_000_000_000,
+        totalDebt: null,
+        totalEquity: null,
+        sharesOutstanding: null,
+        earningsPerShare: null,
+        bookValuePerShare: null,
+      },
+    ]);
+  });
+
   it("returns warnings instead of throwing when optional daily prices and fundamentals are missing", async () => {
     const yahoo: YahooFinanceClient = {
       historical: vi.fn().mockResolvedValue([]),

@@ -155,30 +155,45 @@ function latestByFiscalYear<T extends { endDate?: unknown }>(
     })[0];
 }
 
+function findByFiscalYear<T extends { endDate?: unknown }>(
+  statements: T[] | undefined,
+  fiscalYear: number,
+): T | undefined {
+  return statements?.find(
+    (statement) => fiscalYearFrom(statement) === fiscalYear,
+  );
+}
+
 function mapAnnualFinancial(
   summary: YahooQuoteSummary,
 ): ProviderAnnualFinancial | null {
+  const incomeStatements =
+    summary.incomeStatementHistory?.incomeStatementHistory;
+  const balanceStatements = summary.balanceSheetHistory?.balanceSheetStatements;
   const latestIncome = latestByFiscalYear(
-    summary.incomeStatementHistory?.incomeStatementHistory,
+    incomeStatements,
   );
   const latestBalance = latestByFiscalYear(
-    summary.balanceSheetHistory?.balanceSheetStatements,
+    balanceStatements,
   );
   const fiscalYear = fiscalYearFrom(latestIncome) ?? fiscalYearFrom(latestBalance);
 
   if (fiscalYear === null) return null;
 
+  const matchingIncome = findByFiscalYear(incomeStatements, fiscalYear);
+  const matchingBalance = findByFiscalYear(balanceStatements, fiscalYear);
+
   return {
     fiscalYear,
-    revenue: finiteNumber(latestIncome?.totalRevenue),
-    profitBeforeTax: finiteNumber(latestIncome?.incomeBeforeTax),
-    profitAfterTax: finiteNumber(latestIncome?.netIncome),
-    ebita: finiteNumber(latestIncome?.ebit),
-    totalDebt: finiteNumber(latestBalance?.totalDebt),
+    revenue: finiteNumber(matchingIncome?.totalRevenue),
+    profitBeforeTax: finiteNumber(matchingIncome?.incomeBeforeTax),
+    profitAfterTax: finiteNumber(matchingIncome?.netIncome),
+    ebita: finiteNumber(matchingIncome?.ebit),
+    totalDebt: finiteNumber(matchingBalance?.totalDebt),
     totalEquity:
-      finiteNumber(latestBalance?.totalStockholderEquity) ??
-      finiteNumber(latestBalance?.stockholdersEquity) ??
-      finiteNumber(latestBalance?.totalEquityGrossMinorityInterest),
+      finiteNumber(matchingBalance?.totalStockholderEquity) ??
+      finiteNumber(matchingBalance?.stockholdersEquity) ??
+      finiteNumber(matchingBalance?.totalEquityGrossMinorityInterest),
     sharesOutstanding: finiteNumber(
       summary.defaultKeyStatistics?.sharesOutstanding,
     ),
