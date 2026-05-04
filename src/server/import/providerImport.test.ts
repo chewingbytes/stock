@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "../db";
 import type { MarketDataProvider, ProviderUniverseRow } from "../providers/types";
 import { importFixtures } from "./fixtureImport";
@@ -23,14 +23,51 @@ function rowFor(
   };
 }
 
+async function cleanupGeneratedProviderRows(): Promise<void> {
+  const generatedStocks = await prisma.stock.findMany({
+    where: {
+      stockCode: {
+        startsWith: "Z74",
+        not: "Z74",
+      },
+    },
+    select: { id: true },
+  });
+  const stockIds = generatedStocks.map((stock) => stock.id);
+
+  if (stockIds.length > 0) {
+    await prisma.dailyPrice.deleteMany({ where: { stockId: { in: stockIds } } });
+    await prisma.annualFinancial.deleteMany({
+      where: { stockId: { in: stockIds } },
+    });
+    await prisma.annualDividend.deleteMany({
+      where: { stockId: { in: stockIds } },
+    });
+    await prisma.marketCap.deleteMany({ where: { stockId: { in: stockIds } } });
+    await prisma.derivedMetric.deleteMany({
+      where: { stockId: { in: stockIds } },
+    });
+    await prisma.stock.deleteMany({ where: { id: { in: stockIds } } });
+  }
+
+  await prisma.importRun.deleteMany({
+    where: { source: { startsWith: "provider_import_" } },
+  });
+}
+
 describe("importProviderUniverse", () => {
   beforeEach(async () => {
+    await cleanupGeneratedProviderRows();
     await importFixtures();
+  });
+
+  afterEach(async () => {
+    await cleanupGeneratedProviderRows();
   });
 
   it("normalizes complete provider data into raw fact tables", async () => {
     const now = new Date("2026-05-04T10:00:00.000Z");
-    const stockCode = "Z74";
+    const stockCode = uniqueStockCode("Z74");
     const row = rowFor(
       stockCode,
       "Singapore Telecommunications Ltd",
@@ -118,8 +155,8 @@ describe("importProviderUniverse", () => {
       exchange: "SGX",
       stockName: row.stockName,
       currency: "SGD",
-      sector: "Communication Services",
-      industry: "Telecom",
+      sector: null,
+      industry: null,
       providerSymbol: row.providerSymbol,
       isActive: true,
     });
@@ -255,7 +292,7 @@ describe("importProviderUniverse", () => {
 
   it("rolls back raw facts when a row write fails after starting", async () => {
     const now = new Date("2026-05-04T13:00:00.000Z");
-    const stockCode = "Z74";
+    const stockCode = uniqueStockCode("Z74");
     const row = rowFor(
       stockCode,
       "Singapore Telecommunications Ltd",
@@ -305,24 +342,19 @@ describe("importProviderUniverse", () => {
       failed: 1,
     });
 
-    const stock = await prisma.stock.findFirstOrThrow({
+    const stock = await prisma.stock.findFirst({
       where: { stockCode, market: { code: "SGX" } },
     });
-    const dailyPrice = await prisma.dailyPrice.findUnique({
+    const dailyPrice = await prisma.dailyPrice.findFirst({
       where: {
-        stockId_date: {
-          stockId: stock.id,
-          date: dailyPriceDate,
-        },
+        date: dailyPriceDate,
+        source: provider.source,
       },
     });
-    const marketCap = await prisma.marketCap.findUnique({
+    const marketCap = await prisma.marketCap.findFirst({
       where: {
-        stockId_date_source: {
-          stockId: stock.id,
-          date: dailyPriceDate,
-          source: provider.source,
-        },
+        date: dailyPriceDate,
+        source: provider.source,
       },
     });
     const importRun = await prisma.importRun.findFirstOrThrow({
@@ -330,6 +362,7 @@ describe("importProviderUniverse", () => {
       orderBy: { id: "desc" },
     });
 
+    expect(stock).toBeNull();
     expect(dailyPrice).toBeNull();
     expect(marketCap).toBeNull();
     expect(importRun.status).toBe("failed");
