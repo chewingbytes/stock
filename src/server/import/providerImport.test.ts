@@ -223,4 +223,115 @@ describe("importProviderUniverse", () => {
       "D05: no_daily_prices, no_annual_financials",
     );
   });
+
+  it("records all failed provider rows as a failed import run", async () => {
+    const now = new Date("2026-05-04T12:00:00.000Z");
+    const stockCode = "D05";
+    const row = rowFor(stockCode, "DBS Group Holdings Ltd", "D05.SI");
+    const provider: MarketDataProvider = {
+      source: `provider_import_failed_${stockCode}_${uniqueStockCode("RUN")}`,
+      async fetchStock() {
+        throw new Error("provider unavailable");
+      },
+    };
+
+    const summary = await importProviderUniverse({ provider, rows: [row], now });
+
+    expect(summary).toEqual({
+      source: provider.source,
+      attempted: 1,
+      imported: 0,
+      partial: 0,
+      failed: 1,
+    });
+
+    const importRun = await prisma.importRun.findFirstOrThrow({
+      where: { source: provider.source, importType: "provider_universe" },
+      orderBy: { id: "desc" },
+    });
+    expect(importRun.status).toBe("failed");
+    expect(importRun.message).toContain("D05: provider unavailable");
+  });
+
+  it("rolls back raw facts when a row write fails after starting", async () => {
+    const now = new Date("2026-05-04T13:00:00.000Z");
+    const stockCode = "Z74";
+    const row = rowFor(
+      stockCode,
+      "Singapore Telecommunications Ltd",
+      "Z74.SI",
+    );
+    const dailyPriceDate = new Date(
+      Date.UTC(2035, 0, 1) + Math.floor(Math.random() * 1_000_000_000),
+    );
+    const provider: MarketDataProvider = {
+      source: `provider_import_atomic_${stockCode}_${uniqueStockCode("RUN")}`,
+      async fetchStock(input) {
+        return {
+          row: input,
+          dailyPrices: [
+            {
+              date: dailyPriceDate,
+              open: 2.4,
+              high: 2.5,
+              low: 2.3,
+              close: 2.45,
+              adjustedClose: 2.45,
+              volume: 120_000,
+            },
+          ],
+          annualFinancials: [],
+          annualDividends: [],
+          marketCaps: [
+            {
+              date: dailyPriceDate,
+              marketCap: null as unknown as number,
+              currency: "SGD",
+              calculationMethod: "reported",
+            },
+          ],
+          warnings: [],
+        };
+      },
+    };
+
+    const summary = await importProviderUniverse({ provider, rows: [row], now });
+
+    expect(summary).toEqual({
+      source: provider.source,
+      attempted: 1,
+      imported: 0,
+      partial: 0,
+      failed: 1,
+    });
+
+    const stock = await prisma.stock.findFirstOrThrow({
+      where: { stockCode, market: { code: "SGX" } },
+    });
+    const dailyPrice = await prisma.dailyPrice.findUnique({
+      where: {
+        stockId_date: {
+          stockId: stock.id,
+          date: dailyPriceDate,
+        },
+      },
+    });
+    const marketCap = await prisma.marketCap.findUnique({
+      where: {
+        stockId_date_source: {
+          stockId: stock.id,
+          date: dailyPriceDate,
+          source: provider.source,
+        },
+      },
+    });
+    const importRun = await prisma.importRun.findFirstOrThrow({
+      where: { source: provider.source, importType: "provider_universe" },
+      orderBy: { id: "desc" },
+    });
+
+    expect(dailyPrice).toBeNull();
+    expect(marketCap).toBeNull();
+    expect(importRun.status).toBe("failed");
+  });
 });

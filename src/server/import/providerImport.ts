@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import type {
   MarketDataProvider,
@@ -25,6 +26,8 @@ type MarketDefaults = {
   timezone: string;
 };
 
+type ProviderImportDb = Prisma.TransactionClient;
+
 function marketDefaults(marketCode: string): MarketDefaults {
   if (marketCode === "SGX") {
     return {
@@ -41,10 +44,10 @@ function marketDefaults(marketCode: string): MarketDefaults {
   };
 }
 
-async function upsertMarket(row: ProviderUniverseRow) {
+async function upsertMarket(db: ProviderImportDb, row: ProviderUniverseRow) {
   const defaults = marketDefaults(row.marketCode);
 
-  return prisma.market.upsert({
+  return db.market.upsert({
     where: { code: row.marketCode },
     update: {
       name: defaults.name,
@@ -64,10 +67,10 @@ async function upsertMarket(row: ProviderUniverseRow) {
   });
 }
 
-async function upsertStock(row: ProviderUniverseRow) {
-  const market = await upsertMarket(row);
+async function upsertStock(db: ProviderImportDb, row: ProviderUniverseRow) {
+  const market = await upsertMarket(db, row);
 
-  return prisma.stock.upsert({
+  return db.stock.upsert({
     where: {
       marketId_stockCode: {
         marketId: market.id,
@@ -96,135 +99,153 @@ async function upsertStock(row: ProviderUniverseRow) {
 }
 
 async function writeProviderData(data: ProviderStockData, source: string, now: Date) {
-  const stock = await upsertStock(data.row);
+  await prisma.$transaction(async (tx) => {
+    const stock = await upsertStock(tx, data.row);
 
-  for (const dailyPrice of data.dailyPrices) {
-    await prisma.dailyPrice.upsert({
-      where: {
-        stockId_date: {
+    for (const dailyPrice of data.dailyPrices) {
+      await tx.dailyPrice.upsert({
+        where: {
+          stockId_date: {
+            stockId: stock.id,
+            date: dailyPrice.date,
+          },
+        },
+        update: {
+          open: dailyPrice.open,
+          high: dailyPrice.high,
+          low: dailyPrice.low,
+          close: dailyPrice.close,
+          adjustedClose: dailyPrice.adjustedClose,
+          volume: dailyPrice.volume,
+          source,
+          fetchedAt: now,
+        },
+        create: {
           stockId: stock.id,
           date: dailyPrice.date,
+          open: dailyPrice.open,
+          high: dailyPrice.high,
+          low: dailyPrice.low,
+          close: dailyPrice.close,
+          adjustedClose: dailyPrice.adjustedClose,
+          volume: dailyPrice.volume,
+          source,
+          fetchedAt: now,
         },
-      },
-      update: {
-        open: dailyPrice.open,
-        high: dailyPrice.high,
-        low: dailyPrice.low,
-        close: dailyPrice.close,
-        adjustedClose: dailyPrice.adjustedClose,
-        volume: dailyPrice.volume,
-        source,
-        fetchedAt: now,
-      },
-      create: {
-        stockId: stock.id,
-        date: dailyPrice.date,
-        open: dailyPrice.open,
-        high: dailyPrice.high,
-        low: dailyPrice.low,
-        close: dailyPrice.close,
-        adjustedClose: dailyPrice.adjustedClose,
-        volume: dailyPrice.volume,
-        source,
-        fetchedAt: now,
-      },
-    });
-  }
+      });
+    }
 
-  for (const financial of data.annualFinancials) {
-    await prisma.annualFinancial.upsert({
-      where: {
-        stockId_fiscalYear: {
+    for (const financial of data.annualFinancials) {
+      await tx.annualFinancial.upsert({
+        where: {
+          stockId_fiscalYear: {
+            stockId: stock.id,
+            fiscalYear: financial.fiscalYear,
+          },
+        },
+        update: {
+          revenue: financial.revenue,
+          profitBeforeTax: financial.profitBeforeTax,
+          profitAfterTax: financial.profitAfterTax,
+          ebita: financial.ebita,
+          totalDebt: financial.totalDebt,
+          totalEquity: financial.totalEquity,
+          sharesOutstanding: financial.sharesOutstanding,
+          earningsPerShare: financial.earningsPerShare,
+          bookValuePerShare: financial.bookValuePerShare,
+          source,
+          fetchedAt: now,
+        },
+        create: {
           stockId: stock.id,
           fiscalYear: financial.fiscalYear,
+          revenue: financial.revenue,
+          profitBeforeTax: financial.profitBeforeTax,
+          profitAfterTax: financial.profitAfterTax,
+          ebita: financial.ebita,
+          totalDebt: financial.totalDebt,
+          totalEquity: financial.totalEquity,
+          sharesOutstanding: financial.sharesOutstanding,
+          earningsPerShare: financial.earningsPerShare,
+          bookValuePerShare: financial.bookValuePerShare,
+          source,
+          fetchedAt: now,
         },
-      },
-      update: {
-        revenue: financial.revenue,
-        profitBeforeTax: financial.profitBeforeTax,
-        profitAfterTax: financial.profitAfterTax,
-        ebita: financial.ebita,
-        totalDebt: financial.totalDebt,
-        totalEquity: financial.totalEquity,
-        sharesOutstanding: financial.sharesOutstanding,
-        earningsPerShare: financial.earningsPerShare,
-        bookValuePerShare: financial.bookValuePerShare,
-        source,
-        fetchedAt: now,
-      },
-      create: {
-        stockId: stock.id,
-        fiscalYear: financial.fiscalYear,
-        revenue: financial.revenue,
-        profitBeforeTax: financial.profitBeforeTax,
-        profitAfterTax: financial.profitAfterTax,
-        ebita: financial.ebita,
-        totalDebt: financial.totalDebt,
-        totalEquity: financial.totalEquity,
-        sharesOutstanding: financial.sharesOutstanding,
-        earningsPerShare: financial.earningsPerShare,
-        bookValuePerShare: financial.bookValuePerShare,
-        source,
-        fetchedAt: now,
-      },
-    });
-  }
+      });
+    }
 
-  for (const dividend of data.annualDividends) {
-    await prisma.annualDividend.upsert({
-      where: {
-        stockId_fiscalYear: {
+    for (const dividend of data.annualDividends) {
+      await tx.annualDividend.upsert({
+        where: {
+          stockId_fiscalYear: {
+            stockId: stock.id,
+            fiscalYear: dividend.fiscalYear,
+          },
+        },
+        update: {
+          dividendPerShare: dividend.dividendPerShare,
+          currency: dividend.currency,
+          source,
+          fetchedAt: now,
+        },
+        create: {
           stockId: stock.id,
           fiscalYear: dividend.fiscalYear,
+          dividendPerShare: dividend.dividendPerShare,
+          currency: dividend.currency,
+          source,
+          fetchedAt: now,
         },
-      },
-      update: {
-        dividendPerShare: dividend.dividendPerShare,
-        currency: dividend.currency,
-        source,
-        fetchedAt: now,
-      },
-      create: {
-        stockId: stock.id,
-        fiscalYear: dividend.fiscalYear,
-        dividendPerShare: dividend.dividendPerShare,
-        currency: dividend.currency,
-        source,
-        fetchedAt: now,
-      },
-    });
-  }
+      });
+    }
 
-  for (const marketCap of data.marketCaps) {
-    await prisma.marketCap.upsert({
-      where: {
-        stockId_date_source: {
+    for (const marketCap of data.marketCaps) {
+      await tx.marketCap.upsert({
+        where: {
+          stockId_date_source: {
+            stockId: stock.id,
+            date: marketCap.date,
+            source,
+          },
+        },
+        update: {
+          marketCap: marketCap.marketCap,
+          currency: marketCap.currency,
+          calculationMethod: marketCap.calculationMethod,
+          fetchedAt: now,
+        },
+        create: {
           stockId: stock.id,
           date: marketCap.date,
+          marketCap: marketCap.marketCap,
+          currency: marketCap.currency,
           source,
+          calculationMethod: marketCap.calculationMethod,
+          fetchedAt: now,
         },
-      },
-      update: {
-        marketCap: marketCap.marketCap,
-        currency: marketCap.currency,
-        calculationMethod: marketCap.calculationMethod,
-        fetchedAt: now,
-      },
-      create: {
-        stockId: stock.id,
-        date: marketCap.date,
-        marketCap: marketCap.marketCap,
-        currency: marketCap.currency,
-        source,
-        calculationMethod: marketCap.calculationMethod,
-        fetchedAt: now,
-      },
-    });
-  }
+      });
+    }
+  });
 }
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function importRunStatus(input: {
+  imported: number;
+  partial: number;
+  failed: number;
+}): string {
+  if (input.failed > 0 && input.imported === 0 && input.partial === 0) {
+    return "failed";
+  }
+
+  if (input.failed > 0 || input.partial > 0) {
+    return "partial";
+  }
+
+  return "completed";
 }
 
 export async function importProviderUniverse({
@@ -258,7 +279,7 @@ export async function importProviderUniverse({
     data: {
       source: provider.source,
       importType: "provider_universe",
-      status: partial === 0 && failed === 0 ? "completed" : "partial",
+      status: importRunStatus({ imported, partial, failed }),
       startedAt: now,
       completedAt: now,
       message: messages.length > 0 ? messages.join("\n") : null,
