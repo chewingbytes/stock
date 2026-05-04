@@ -33,6 +33,8 @@ export type ScreenRow = {
 
 export type ScreenResult = {
   criteria: RangeFilter[];
+  universeTotal: number;
+  filteredOut: number;
   total: number;
   page: number;
   pageSize: number;
@@ -127,7 +129,9 @@ export async function runScreen(input: ScreenInput): Promise<ScreenResult> {
     return (leftValue - rightValue) * direction;
   });
 
+  const universeTotal = rows.length;
   const total = filteredRows.length;
+  const filteredOut = universeTotal - total;
   const start = (input.page - 1) * input.pageSize;
   const pagedRows = filteredRows.slice(start, start + input.pageSize);
 
@@ -141,6 +145,8 @@ export async function runScreen(input: ScreenInput): Promise<ScreenResult> {
 
   return {
     criteria: validation.filters,
+    universeTotal,
+    filteredOut,
     total,
     page: input.page,
     pageSize: input.pageSize,

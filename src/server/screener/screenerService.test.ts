@@ -21,6 +21,8 @@ describe("runScreen", () => {
     expect(result.criteria).toEqual([
       { metricKey: "pe_ratio", min: 1, max: 40 },
     ]);
+    expect(result.universeTotal).toBeGreaterThanOrEqual(result.total);
+    expect(result.filteredOut).toBe(result.universeTotal - result.total);
   });
 
   it("returns missing metric markers without hiding unfiltered stocks", async () => {
