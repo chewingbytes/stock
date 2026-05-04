@@ -47,6 +47,26 @@ The fixture dataset is deterministic and exists for development. Production
 market data should be imported through provider adapters or CSV import. V1 uses
 native currencies and does not convert USD and SGD values.
 
+## Yahoo Finance Prototype Import
+
+The Yahoo Finance importer is a personal/internal research prototype. Yahoo
+Finance is an unofficial source for this workflow and should not be treated as
+suitable for public data redistribution.
+
+Run the prototype import and recompute derived metrics with:
+
+```powershell
+npm run import:yahoo
+npm run metrics:recompute
+```
+
+Curated provider symbols live in:
+
+- `data/provider-universe/us.csv`
+- `data/provider-universe/sg.csv`
+
+CSV import remains available for missing or corrected SGX fundamentals.
+
 ## Non-Advice Notice
 
 Screening results are research candidates. They are not buy, sell, or hold
