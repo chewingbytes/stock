@@ -227,6 +227,88 @@ describe("importProviderUniverse", () => {
     );
   });
 
+  it("preserves existing fixture annual financials and dividends from other sources", async () => {
+    const now = new Date("2026-05-04T11:30:00.000Z");
+    const stockCode = "D05";
+    const row = rowFor(stockCode, "DBS Group Holdings Ltd", "D05.SI");
+    const provider: MarketDataProvider = {
+      source: `provider_import_skip_existing_${stockCode}_${uniqueStockCode("RUN")}`,
+      async fetchStock(input) {
+        return {
+          row: input,
+          dailyPrices: [],
+          annualFinancials: [
+            {
+              fiscalYear: 2025,
+              revenue: null,
+              profitBeforeTax: null,
+              profitAfterTax: null,
+              ebita: null,
+              totalDebt: null,
+              totalEquity: null,
+              sharesOutstanding: null,
+              earningsPerShare: null,
+              bookValuePerShare: null,
+            },
+          ],
+          annualDividends: [
+            {
+              fiscalYear: 2025,
+              dividendPerShare: null,
+              currency: "SGD",
+            },
+          ],
+          marketCaps: [],
+          warnings: [],
+        };
+      },
+    };
+
+    const summary = await importProviderUniverse({ provider, rows: [row], now });
+
+    expect(summary).toEqual({
+      source: provider.source,
+      attempted: 1,
+      imported: 0,
+      partial: 1,
+      failed: 0,
+    });
+
+    const stock = await prisma.stock.findFirstOrThrow({
+      where: { stockCode, market: { code: "SGX" } },
+    });
+    const financial = await prisma.annualFinancial.findUniqueOrThrow({
+      where: {
+        stockId_fiscalYear: {
+          stockId: stock.id,
+          fiscalYear: 2025,
+        },
+      },
+    });
+    const dividend = await prisma.annualDividend.findUniqueOrThrow({
+      where: {
+        stockId_fiscalYear: {
+          stockId: stock.id,
+          fiscalYear: 2025,
+        },
+      },
+    });
+    const importRun = await prisma.importRun.findFirstOrThrow({
+      where: { source: provider.source, importType: "provider_universe" },
+      orderBy: { id: "desc" },
+    });
+
+    expect(Number(financial.revenue)).toBe(24_000_000_000);
+    expect(Number(financial.profitAfterTax)).toBe(11_200_000_000);
+    expect(financial.source).toBe("fixture");
+    expect(Number(dividend.dividendPerShare)).toBe(2.4);
+    expect(dividend.source).toBe("fixture");
+    expect(importRun.status).toBe("partial");
+    expect(importRun.message).toContain(
+      "D05: skipped_existing_annual_financial, skipped_existing_annual_dividend",
+    );
+  });
+
   it("records all failed provider rows as a failed import run", async () => {
     const now = new Date("2026-05-04T12:00:00.000Z");
     const stockCode = "D05";

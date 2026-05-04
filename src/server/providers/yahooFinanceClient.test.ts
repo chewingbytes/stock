@@ -210,6 +210,52 @@ describe("createYahooFinanceProvider", () => {
         bookValuePerShare: null,
       },
     ]);
+    expect(data.warnings).toEqual(["annual_financials_incomplete"]);
+  });
+
+  it("returns historical and quote data with a warning when quoteSummary fails", async () => {
+    const now = new Date("2026-05-04T12:00:00.000Z");
+    const yahoo: YahooFinanceClient = {
+      historical: vi.fn().mockResolvedValue([
+        {
+          date: new Date("2026-05-01T00:00:00.000Z"),
+          open: 170,
+          high: 173,
+          low: 169,
+          close: 172,
+        },
+      ]),
+      quote: vi.fn().mockResolvedValue({
+        marketCap: 2_650_000_000_000,
+        currency: "USD",
+      }),
+      quoteSummary: vi.fn().mockRejectedValue(new Error("summary unavailable")),
+    };
+
+    const provider = createYahooFinanceProvider({ yahoo, now: () => now });
+
+    await expect(provider.fetchStock(row)).resolves.toMatchObject({
+      dailyPrices: [
+        {
+          date: new Date("2026-05-01T00:00:00.000Z"),
+          open: 170,
+          high: 173,
+          low: 169,
+          close: 172,
+        },
+      ],
+      annualFinancials: [],
+      annualDividends: [],
+      marketCaps: [
+        {
+          date: now,
+          marketCap: 2_650_000_000_000,
+          currency: "USD",
+          calculationMethod: "reported",
+        },
+      ],
+      warnings: ["quote_summary_failed", "no_annual_financials"],
+    });
   });
 
   it("returns warnings instead of throwing when optional daily prices and fundamentals are missing", async () => {

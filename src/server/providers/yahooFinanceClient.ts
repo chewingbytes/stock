@@ -216,6 +216,18 @@ function mapMarketCap(quote: YahooQuote, now: Date, fallbackCurrency: string) {
   ];
 }
 
+function annualFinancialIsIncomplete(financial: ProviderAnnualFinancial): boolean {
+  return [
+    financial.revenue,
+    financial.profitAfterTax,
+    financial.totalDebt,
+    financial.totalEquity,
+    financial.sharesOutstanding,
+    financial.earningsPerShare,
+    financial.bookValuePerShare,
+  ].some((value) => value === null);
+}
+
 export function createYahooFinanceProvider(
   deps: YahooFinanceProviderDeps = {},
 ): MarketDataProvider {
@@ -227,14 +239,23 @@ export function createYahooFinanceProvider(
     source: "yahoo_finance",
     async fetchStock(row) {
       const now = getNow();
-      const [historicalRows, quote, quoteSummary] = await Promise.all([
+      const warnings: string[] = [];
+      const [historicalRows, quote] = await Promise.all([
         yahoo.historical(row.providerSymbol, {
           period1: oneYearBefore(now),
           interval: "1d",
         }),
         yahoo.quote(row.providerSymbol),
-        yahoo.quoteSummary(row.providerSymbol, { modules: quoteSummaryModules }),
       ]);
+      let quoteSummary: YahooQuoteSummary = {};
+
+      try {
+        quoteSummary = await yahoo.quoteSummary(row.providerSymbol, {
+          modules: quoteSummaryModules,
+        });
+      } catch {
+        warnings.push("quote_summary_failed");
+      }
 
       const dailyPrices = historicalRows
         .map((historicalRow) => mapDailyPrice(historicalRow))
@@ -242,10 +263,16 @@ export function createYahooFinanceProvider(
       const annualFinancial = mapAnnualFinancial(quoteSummary);
       const annualFinancials = annualFinancial ? [annualFinancial] : [];
       const dividendRate = finiteNumber(quoteSummary.summaryDetail?.dividendRate);
-      const warnings: string[] = [];
 
       if (dailyPrices.length === 0) warnings.push("no_daily_prices");
       if (annualFinancials.length === 0) warnings.push("no_annual_financials");
+      if (
+        annualFinancials.some((financial) =>
+          annualFinancialIsIncomplete(financial),
+        )
+      ) {
+        warnings.push("annual_financials_incomplete");
+      }
 
       return {
         row,

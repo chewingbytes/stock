@@ -98,11 +98,30 @@ async function upsertStock(db: ProviderImportDb, row: ProviderUniverseRow) {
   });
 }
 
-async function writeProviderData(data: ProviderStockData, source: string, now: Date) {
-  await prisma.$transaction(async (tx) => {
+async function writeProviderData(
+  data: ProviderStockData,
+  source: string,
+  now: Date,
+): Promise<string[]> {
+  return prisma.$transaction(async (tx) => {
+    const warnings: string[] = [];
     const stock = await upsertStock(tx, data.row);
 
     for (const dailyPrice of data.dailyPrices) {
+      const existing = await tx.dailyPrice.findUnique({
+        where: {
+          stockId_date: {
+            stockId: stock.id,
+            date: dailyPrice.date,
+          },
+        },
+      });
+
+      if (existing && existing.source !== source) {
+        warnings.push("skipped_existing_daily_price");
+        continue;
+      }
+
       await tx.dailyPrice.upsert({
         where: {
           stockId_date: {
@@ -136,6 +155,20 @@ async function writeProviderData(data: ProviderStockData, source: string, now: D
     }
 
     for (const financial of data.annualFinancials) {
+      const existing = await tx.annualFinancial.findUnique({
+        where: {
+          stockId_fiscalYear: {
+            stockId: stock.id,
+            fiscalYear: financial.fiscalYear,
+          },
+        },
+      });
+
+      if (existing && existing.source !== source) {
+        warnings.push("skipped_existing_annual_financial");
+        continue;
+      }
+
       await tx.annualFinancial.upsert({
         where: {
           stockId_fiscalYear: {
@@ -175,6 +208,20 @@ async function writeProviderData(data: ProviderStockData, source: string, now: D
     }
 
     for (const dividend of data.annualDividends) {
+      const existing = await tx.annualDividend.findUnique({
+        where: {
+          stockId_fiscalYear: {
+            stockId: stock.id,
+            fiscalYear: dividend.fiscalYear,
+          },
+        },
+      });
+
+      if (existing && existing.source !== source) {
+        warnings.push("skipped_existing_annual_dividend");
+        continue;
+      }
+
       await tx.annualDividend.upsert({
         where: {
           stockId_fiscalYear: {
@@ -225,6 +272,8 @@ async function writeProviderData(data: ProviderStockData, source: string, now: D
         },
       });
     }
+
+    return warnings;
   });
 }
 
@@ -261,11 +310,14 @@ export async function importProviderUniverse({
   for (const row of rows) {
     try {
       const data = await provider.fetchStock(row);
-      await writeProviderData(data, provider.source, now);
+      const warnings = [
+        ...data.warnings,
+        ...(await writeProviderData(data, provider.source, now)),
+      ];
 
-      if (data.warnings.length > 0) {
+      if (warnings.length > 0) {
         partial += 1;
-        messages.push(`${row.stockCode}: ${data.warnings.join(", ")}`);
+        messages.push(`${row.stockCode}: ${warnings.join(", ")}`);
       } else {
         imported += 1;
       }
