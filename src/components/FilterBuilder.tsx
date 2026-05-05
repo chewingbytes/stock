@@ -26,10 +26,21 @@ export function FilterBuilder({
   }
 
   function addFilter() {
-    addMetric("pe_ratio");
+    const nextMetric = availableFilters.find(
+      (definition) =>
+        !filters.some((filter) => filter.metricKey === definition.metricKey),
+    );
+
+    if (nextMetric) {
+      addMetric(nextMetric.metricKey);
+    }
   }
 
   function addMetric(metricKey: MetricKey) {
+    if (filters.some((filter) => filter.metricKey === metricKey)) {
+      return;
+    }
+
     const definition = beginnerMetricDefinitions[metricKey];
 
     onChange([
@@ -46,19 +57,49 @@ export function FilterBuilder({
     onChange(filters.filter((_, itemIndex) => itemIndex !== index));
   }
 
+  function toggleMetric(metricKey: MetricKey) {
+    const existingIndex = filters.findIndex(
+      (filter) => filter.metricKey === metricKey,
+    );
+
+    if (existingIndex >= 0) {
+      removeFilter(existingIndex);
+      return;
+    }
+
+    addMetric(metricKey);
+  }
+
+  function metricOptionsFor(currentIndex: number) {
+    const selectedByOtherRows = new Set(
+      filters
+        .filter((_, index) => index !== currentIndex)
+        .map((filter) => filter.metricKey),
+    );
+
+    return availableFilters.filter(
+      (option) => !selectedByOtherRows.has(option.metricKey),
+    );
+  }
+
   return (
     <section className="panel filter-builder">
       <div className="panel-title">
         <div>
-          <p className="eyebrow">Beginner filters</p>
+          <p className="eyebrow">Quick filters</p>
           <h2>Build your screen</h2>
         </div>
-        <button className="secondary-button" type="button" onClick={addFilter}>
+        <button
+          className="secondary-button"
+          type="button"
+          onClick={addFilter}
+          disabled={filters.length >= availableFilters.length}
+        >
           Add Filter
         </button>
       </div>
 
-      <div className="metric-card-grid" aria-label="Beginner metric library">
+      <div className="metric-card-grid" aria-label="Quick filters">
         {starterMetrics.map((metricKey) => {
           const definition = beginnerMetricDefinitions[metricKey];
           const isActive = filters.some((filter) => filter.metricKey === metricKey);
@@ -66,12 +107,18 @@ export function FilterBuilder({
           return (
             <button
               className={isActive ? "metric-card active" : "metric-card"}
-              disabled={isActive}
               key={metricKey}
-              onClick={() => addMetric(metricKey)}
+              onClick={() => toggleMetric(metricKey)}
+              aria-pressed={isActive}
+              aria-label={`${isActive ? "Remove" : "Add"} quick filter ${
+                definition.label
+              }`}
               type="button"
             >
-              <span>{definition.label}</span>
+              <span>
+                {definition.label}
+                <em>{isActive ? "On" : "Off"}</em>
+              </span>
               <small>{definition.explanation}</small>
             </button>
           );
@@ -90,7 +137,7 @@ export function FilterBuilder({
                 })
               }
             >
-              {availableFilters.map((option) => (
+              {metricOptionsFor(index).map((option) => (
                 <option key={option.metricKey} value={option.metricKey}>
                   {option.label}
                 </option>

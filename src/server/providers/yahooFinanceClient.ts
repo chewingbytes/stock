@@ -58,7 +58,7 @@ type YahooQuoteSummary = {
 export type YahooFinanceClient = {
   historical(
     symbol: string,
-    options: { period1: Date; interval: "1d" },
+    options: { period1: Date; period2: Date; interval: "1d" },
   ): Promise<YahooHistoricalRow[]>;
   quote(symbol: string): Promise<YahooQuote>;
   quoteSummary(
@@ -243,6 +243,7 @@ export function createYahooFinanceProvider(
       const [historicalRows, quote] = await Promise.all([
         yahoo.historical(row.providerSymbol, {
           period1: oneYearBefore(now),
+          period2: now,
           interval: "1d",
         }),
         yahoo.quote(row.providerSymbol),

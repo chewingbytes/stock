@@ -32,6 +32,7 @@ describe("createYahooFinanceProvider", () => {
     expect(createYahoo).toHaveBeenCalledTimes(1);
     expect(yahoo.historical).toHaveBeenCalledWith("AAPL", {
       period1: new Date("2025-05-04T12:00:00.000Z"),
+      period2: new Date("2026-05-04T12:00:00.000Z"),
       interval: "1d",
     });
   });
@@ -94,6 +95,7 @@ describe("createYahooFinanceProvider", () => {
     expect(provider.source).toBe("yahoo_finance");
     expect(yahoo.historical).toHaveBeenCalledWith("AAPL", {
       period1: new Date("2025-05-04T12:00:00.000Z"),
+      period2: now,
       interval: "1d",
     });
     expect(yahoo.quote).toHaveBeenCalledWith("AAPL");

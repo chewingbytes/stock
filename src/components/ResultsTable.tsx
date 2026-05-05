@@ -21,6 +21,7 @@ type ScreenRow = {
 export function ResultsTable({
   rows,
   metricKeys,
+  totalCount,
   selectedRowKey = null,
   onSelectRow,
   emptyMessage = "Run a screen to see matching stocks.",
@@ -28,6 +29,7 @@ export function ResultsTable({
 }: {
   rows: ScreenRow[];
   metricKeys: MetricKey[];
+  totalCount?: number;
   selectedRowKey?: string | null;
   onSelectRow?: (rowKey: string) => void;
   emptyMessage?: string;
@@ -35,7 +37,15 @@ export function ResultsTable({
 }) {
   return (
     <section className="panel table-panel">
-      <h2>{title}</h2>
+      <div className="table-panel-title">
+        <h2>{title}</h2>
+        {totalCount !== undefined ? (
+          <span className="result-count">
+            {totalCount.toLocaleString()}{" "}
+            {totalCount === 1 ? "result" : "results"}
+          </span>
+        ) : null}
+      </div>
       <div className="table-scroll">
         <table>
           <thead>

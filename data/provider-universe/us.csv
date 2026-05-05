@@ -2,3 +2,21 @@ marketCode,exchange,stockCode,stockName,currency,providerSymbol
 US,NASDAQ,AAPL,Apple Inc,USD,AAPL
 US,NASDAQ,MSFT,Microsoft Corporation,USD,MSFT
 US,NASDAQ,NVDA,NVIDIA Corporation,USD,NVDA
+US,NASDAQ,GOOGL,Alphabet Inc Class A,USD,GOOGL
+US,NASDAQ,AMZN,Amazon.com Inc,USD,AMZN
+US,NASDAQ,META,Meta Platforms Inc,USD,META
+US,NASDAQ,TSLA,Tesla Inc,USD,TSLA
+US,NYSE,BRK.B,Berkshire Hathaway Inc Class B,USD,BRK-B
+US,NYSE,JPM,JPMorgan Chase & Co,USD,JPM
+US,NYSE,V,Visa Inc,USD,V
+US,NYSE,UNH,UnitedHealth Group Inc,USD,UNH
+US,NYSE,JNJ,Johnson & Johnson,USD,JNJ
+US,NYSE,WMT,Walmart Inc,USD,WMT
+US,NYSE,XOM,Exxon Mobil Corporation,USD,XOM
+US,NYSE,PG,Procter & Gamble Co,USD,PG
+US,NYSE,MA,Mastercard Incorporated,USD,MA
+US,NYSE,HD,Home Depot Inc,USD,HD
+US,NASDAQ,COST,Costco Wholesale Corporation,USD,COST
+US,NASDAQ,AVGO,Broadcom Inc,USD,AVGO
+US,NASDAQ,ADBE,Adobe Inc,USD,ADBE
+US,NASDAQ,NFLX,Netflix Inc,USD,NFLX

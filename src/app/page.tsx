@@ -4,13 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CriteriaSummary } from "../components/CriteriaSummary";
 import { ExportButton } from "../components/ExportButton";
 import { FilterBuilder } from "../components/FilterBuilder";
+import { GlossaryPanel } from "../components/GlossaryPanel";
 import { MarketSelector } from "../components/MarketSelector";
-import { MetricLearningPanel } from "../components/MetricLearningPanel";
 import { ResultsTable } from "../components/ResultsTable";
 import { RowExplanation } from "../components/RowExplanation";
 import { ScreenTabs, type ScreenTab } from "../components/ScreenTabs";
 import { UniverseSummary } from "../components/UniverseSummary";
-import type { MetricKey, RangeFilter } from "../domain/types";
+import type { RangeFilter } from "../domain/types";
 
 type ScreenResult = {
   criteria: RangeFilter[];
@@ -48,9 +48,10 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
   const [activeTab, setActiveTab] = useState<ScreenTab>("results");
-  const [selectedMetricKey, setSelectedMetricKey] =
-    useState<MetricKey>("pe_ratio");
   const [selectedRowKey, setSelectedRowKey] = useState<string | null>(null);
+  const [lastScreenSignature, setLastScreenSignature] = useState<string | null>(
+    null,
+  );
   const initialScreenRan = useRef(false);
 
   useEffect(() => {
@@ -61,6 +62,16 @@ export default function HomePage() {
     () => filters.map((filter) => filter.metricKey),
     [filters],
   );
+
+  const screenSignature = useMemo(
+    () => JSON.stringify({ filters, markets }),
+    [filters, markets],
+  );
+
+  const filtersChangedSinceScreen =
+    result !== null &&
+    lastScreenSignature !== null &&
+    screenSignature !== lastScreenSignature;
 
   const selectedRow = useMemo(() => {
     if (!selectedRowKey || !result) {
@@ -109,12 +120,13 @@ export default function HomePage() {
 
       setResult(screenResult);
       setUniverseResult(stockUniverse);
+      setLastScreenSignature(screenSignature);
     } catch {
       setError("Screen failed. Check filter values and try again.");
     } finally {
       setLoading(false);
     }
-  }, [fetchScreen, filters]);
+  }, [fetchScreen, filters, screenSignature]);
 
   useEffect(() => {
     if (!ready || initialScreenRan.current) {
@@ -124,10 +136,6 @@ export default function HomePage() {
     initialScreenRan.current = true;
     void runScreen();
   }, [ready, runScreen]);
-
-  useEffect(() => {
-    setSelectedMetricKey(filters[0]?.metricKey ?? "pe_ratio");
-  }, [filters]);
 
   return (
     <main className="app-shell">
@@ -140,13 +148,9 @@ export default function HomePage() {
       </header>
 
       <div className="workspace">
-        <aside className="market-column">
-          <MarketSelector selectedMarkets={markets} onChange={setMarkets} />
-        </aside>
-
         <aside className="sidebar">
+          <MarketSelector selectedMarkets={markets} onChange={setMarkets} />
           <FilterBuilder filters={filters} onChange={setFilters} />
-          <MetricLearningPanel metricKey={selectedMetricKey} />
           <button
             className="primary"
             type="button"
@@ -171,14 +175,13 @@ export default function HomePage() {
             Screening results are research candidates, not financial advice.
             Data may be delayed, missing, or imported from CSV.
           </p>
+          {filtersChangedSinceScreen && !loading ? (
+            <p className="pending-screen" role="status">
+              Filters changed. Run screen to update results.
+            </p>
+          ) : null}
           {activeTab === "learn" ? (
-            <section className="panel learn-tab-panel">
-              <h2>Learn</h2>
-              <p>
-                Choose a metric card to learn what it means before using it to
-                narrow the stock universe.
-              </p>
-            </section>
+            <GlossaryPanel />
           ) : (
             <ResultsTable
               emptyMessage={
@@ -196,6 +199,9 @@ export default function HomePage() {
                   : (result?.rows ?? [])
               }
               selectedRowKey={selectedRowKey}
+              totalCount={
+                activeTab === "universe" ? universeResult?.total : result?.total
+              }
               title={activeTab === "universe" ? "Stock Universe" : "Results"}
             />
           )}
