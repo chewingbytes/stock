@@ -140,9 +140,13 @@ export default function HomePage() {
       </header>
 
       <div className="workspace">
-        <aside className="sidebar">
+        <aside className="market-column">
           <MarketSelector selectedMarkets={markets} onChange={setMarkets} />
+        </aside>
+
+        <aside className="sidebar">
           <FilterBuilder filters={filters} onChange={setFilters} />
+          <MetricLearningPanel metricKey={selectedMetricKey} />
           <button
             className="primary"
             type="button"
@@ -200,8 +204,6 @@ export default function HomePage() {
             stockName={selectedRow?.stockName ?? null}
           />
         </section>
-
-        <MetricLearningPanel metricKey={selectedMetricKey} />
       </div>
     </main>
   );
