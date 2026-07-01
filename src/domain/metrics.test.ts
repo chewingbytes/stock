@@ -27,12 +27,12 @@ describe("metric formulas", () => {
     });
   });
 
-  it("calculates revenue growth", () => {
+  it("calculates revenue growth as a percentage", () => {
     expect(
       calculateRevenueGrowthRate({ latestRevenue: 125, priorRevenue: 100 }),
     ).toEqual({
       status: "complete",
-      value: 0.25,
+      value: 25,
     });
   });
 
@@ -45,7 +45,7 @@ describe("metric formulas", () => {
     });
   });
 
-  it("calculates profit growth using profit after tax", () => {
+  it("calculates profit growth using profit after tax as a percentage", () => {
     expect(
       calculateProfitGrowthRate({
         latestProfitAfterTax: 90,
@@ -53,16 +53,16 @@ describe("metric formulas", () => {
       }),
     ).toEqual({
       status: "complete",
-      value: 0.5,
+      value: 50,
     });
   });
 
-  it("calculates dividend yield", () => {
+  it("calculates dividend yield as a percentage", () => {
     expect(
       calculateDividendYield({ dividendPerShare: 0.5, closePrice: 20 }),
     ).toEqual({
       status: "complete",
-      value: 0.025,
+      value: 2.5,
     });
   });
 
@@ -75,12 +75,12 @@ describe("metric formulas", () => {
     });
   });
 
-  it("calculates dividend growth", () => {
+  it("calculates dividend growth as a percentage", () => {
     expect(
       calculateDividendGrowthRate({ latestDividend: 0.6, priorDividend: 0.5 }),
     ).toEqual({
       status: "complete",
-      value: 0.2,
+      value: 20,
     });
   });
 

@@ -1,0 +1,50 @@
+name: Refresh stock data
+
+# Pulls fresh prices + fundamentals from Yahoo Finance into Neon and recomputes
+# the derived metrics the screener reads. Runs on a schedule and can be triggered
+# manually from the Actions tab.
+#
+# Setup (one time): add a repository secret named DATABASE_URL set to the Neon
+# **direct / non-pooler** connection string (Settings -> Secrets and variables ->
+# Actions). The direct connection is required because the importer uses
+# interactive transactions, which the pooled (pgBouncer) endpoint cannot hold.
+
+on:
+  schedule:
+    # 22:00 UTC on weekdays — after the US market close (and the same day's SGX
+    # close). Cron in GitHub Actions is always UTC.
+    - cron: "0 22 * * 1-5"
+  workflow_dispatch: {}
+
+# Never let two refreshes run at once.
+concurrency:
+  group: refresh-data
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Import latest Yahoo Finance data
+        run: npm run import:yahoo
+
+      - name: Recompute derived metrics
+        run: npm run metrics:recompute

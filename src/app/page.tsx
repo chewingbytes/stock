@@ -35,6 +35,8 @@ type ScreenResult = {
     >;
   }>;
   total: number;
+  lastUpdated: string | null;
+  dataSource: string | null;
 };
 
 export default function HomePage() {
@@ -182,6 +184,8 @@ export default function HomePage() {
             matched={result?.total ?? 0}
             markets={markets}
             universeTotal={result?.universeTotal ?? 0}
+            lastUpdated={result?.lastUpdated ?? null}
+            dataSource={result?.dataSource ?? null}
           />
           <ScreenTabs activeTab={activeTab} onChange={setActiveTab} />
           <CriteriaSummary markets={markets} filters={filters} />

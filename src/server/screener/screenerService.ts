@@ -39,6 +39,8 @@ export type ScreenResult = {
   page: number;
   pageSize: number;
   rows: ScreenRow[];
+  lastUpdated: string | null;
+  dataSource: string | null;
 };
 
 function metricPassesFilter(
@@ -135,6 +137,10 @@ export async function runScreen(input: ScreenInput): Promise<ScreenResult> {
   const start = (input.page - 1) * input.pageSize;
   const pagedRows = filteredRows.slice(start, start + input.pageSize);
 
+  const lastImport = await prisma.importRun.findFirst({
+    orderBy: { id: "desc" },
+  });
+
   await prisma.screenRun.create({
     data: {
       selectedMarkets: JSON.stringify(input.markets),
@@ -151,5 +157,8 @@ export async function runScreen(input: ScreenInput): Promise<ScreenResult> {
     page: input.page,
     pageSize: input.pageSize,
     rows: pagedRows,
+    lastUpdated:
+      (lastImport?.completedAt ?? lastImport?.startedAt)?.toISOString() ?? null,
+    dataSource: lastImport?.source ?? null,
   };
 }

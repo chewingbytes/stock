@@ -63,7 +63,7 @@ export function calculateRevenueGrowthRate(input: {
 
   if (priorRevenue <= 0) return unavailable("prior_revenue_not_positive");
 
-  return complete((latestRevenue - priorRevenue) / priorRevenue);
+  return complete(((latestRevenue - priorRevenue) / priorRevenue) * 100);
 }
 
 export function calculateProfitGrowthRate(input: {
@@ -86,7 +86,7 @@ export function calculateProfitGrowthRate(input: {
     return unavailable("prior_profit_after_tax_not_positive");
   }
 
-  return complete((latestProfit - priorProfit) / priorProfit);
+  return complete(((latestProfit - priorProfit) / priorProfit) * 100);
 }
 
 export function calculateDividendYield(input: {
@@ -105,7 +105,7 @@ export function calculateDividendYield(input: {
   if (dividend < 0) return unavailable("dividend_per_share_negative");
   if (closePrice <= 0) return unavailable("close_price_not_positive");
 
-  return complete(dividend / closePrice);
+  return complete((dividend / closePrice) * 100);
 }
 
 export function calculateDividendGrowthRate(input: {
@@ -126,7 +126,7 @@ export function calculateDividendGrowthRate(input: {
 
   if (priorDividend <= 0) return unavailable("prior_dividend_not_positive");
 
-  return complete((latestDividend - priorDividend) / priorDividend);
+  return complete(((latestDividend - priorDividend) / priorDividend) * 100);
 }
 
 export function calculatePeRatio(input: {
