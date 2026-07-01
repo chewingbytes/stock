@@ -95,7 +95,7 @@ export function FilterBuilder({
           onClick={addFilter}
           disabled={filters.length >= availableFilters.length}
         >
-          Add Filter
+          <span aria-hidden="true">+</span> Add Filter
         </button>
       </div>
 
@@ -124,6 +124,10 @@ export function FilterBuilder({
           );
         })}
       </div>
+
+      {filters.length > 0 ? (
+        <div className="filter-divider">Active ranges</div>
+      ) : null}
 
       <div className="filter-list">
         {filters.map((filter, index) => (

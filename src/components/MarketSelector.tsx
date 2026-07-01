@@ -17,24 +17,26 @@ export function MarketSelector({
   return (
     <fieldset className="panel">
       <legend>Markets</legend>
-      <label>
-        <input
-          aria-label="United States"
-          type="checkbox"
-          checked={selectedMarkets.includes("US")}
-          onChange={() => toggle("US")}
-        />
-        United States
-      </label>
-      <label>
-        <input
-          aria-label="Singapore"
-          type="checkbox"
-          checked={selectedMarkets.includes("SGX")}
-          onChange={() => toggle("SGX")}
-        />
-        Singapore
-      </label>
+      <div className="market-options">
+        <label>
+          <input
+            aria-label="United States"
+            type="checkbox"
+            checked={selectedMarkets.includes("US")}
+            onChange={() => toggle("US")}
+          />
+          United States
+        </label>
+        <label>
+          <input
+            aria-label="Singapore"
+            type="checkbox"
+            checked={selectedMarkets.includes("SGX")}
+            onChange={() => toggle("SGX")}
+          />
+          Singapore
+        </label>
+      </div>
     </fieldset>
   );
 }

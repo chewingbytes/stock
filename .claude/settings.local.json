@@ -2,7 +2,17 @@
   "permissions": {
     "allow": [
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(git commit *)",
+      "PowerShell(New-Item *)",
+      "PowerShell(Copy-Item *)",
+      "Bash(git *)",
+      "PowerShell($h1 = \\(Get-FileHash \"C:\\\\Users\\\\ahmad\\\\Desktop\\\\repos\\\\stock-screener\\\\Phase 1\\\\tsconfig.json\"\\).Hash; $h2 = \\(Get-FileHash \"C:\\\\Users\\\\ahmad\\\\Desktop\\\\repos\\\\stock-screener\\\\tsconfig.json\"\\).Hash; \"Phase 1 tsconfig hash: $h1\"; \"Parent tsconfig hash:  $h2\"; if \\($h1 -eq $h2\\) { \"MATCH\" } else { \"MISMATCH\" })",
+      "PowerShell($h1 = \\(Get-FileHash \"C:\\\\Users\\\\ahmad\\\\Desktop\\\\repos\\\\stock-screener\\\\Phase 1\\\\next.config.ts\"\\).Hash; $h2 = \\(Get-FileHash \"C:\\\\Users\\\\ahmad\\\\Desktop\\\\repos\\\\stock-screener\\\\next.config.ts\"\\).Hash; \"Phase 1 next.config hash: $h1\"; \"Parent next.config hash:  $h2\"; if \\($h1 -eq $h2\\) { \"MATCH\" } else { \"MISMATCH\" })",
+      "PowerShell(git *)",
+      "Bash(Get-FileHash \"data/fixtures/markets.csv\", \"data/fixtures/stocks.csv\", \"data/fixtures/daily_prices.csv\", \"data/fixtures/annual_financials.csv\", \"data/fixtures/annual_dividends.csv\", \"src/domain/types.ts\", \"src/domain/metrics.ts\", \"src/domain/filtering.ts\", \"src/server/csv/readCsv.ts\")",
+      "Bash(Select-Object Hash, Path)",
+      "Bash(Format-Table -AutoSize)"
     ]
   }
 }

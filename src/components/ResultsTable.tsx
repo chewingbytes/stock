@@ -79,7 +79,9 @@ export function ResultsTable({
                   >
                     <td>{row.marketCode}</td>
                     <td>{row.exchange}</td>
-                    <td>{row.stockCode}</td>
+                    <td>
+                      <span className="stock-code">{row.stockCode}</span>
+                    </td>
                     <td>{row.stockName}</td>
                     <td>{row.currency}</td>
                     {metricKeys.map((key) => {

@@ -138,16 +138,30 @@ export default function HomePage() {
   }, [ready, runScreen]);
 
   return (
-    <main className="app-shell">
-      <header className="page-header">
-        <div>
-          <h1>Stock Screener</h1>
-          <p>Filter end-of-day US and Singapore stocks for further research.</p>
+    <>
+      <div className="app-bar">
+        <div className="brand">
+          <span className="brand-mark" aria-hidden="true">
+            S
+          </span>
+          <span>
+            <span className="brand-name">Screener</span>
+            <span className="brand-tag">Equity research</span>
+          </span>
         </div>
         <ExportButton markets={markets} filters={filters} />
-      </header>
+      </div>
 
-      <div className="workspace">
+      <main className="app-shell">
+        <header className="hero">
+          <h1>Stock Screener</h1>
+          <p className="hero-lead">
+            Filter end-of-day US and Singapore stocks against fundamental
+            criteria to build a shortlist of research candidates.
+          </p>
+        </header>
+
+        <div className="workspace">
         <aside className="sidebar">
           <MarketSelector selectedMarkets={markets} onChange={setMarkets} />
           <FilterBuilder filters={filters} onChange={setFilters} />
@@ -172,11 +186,15 @@ export default function HomePage() {
           <ScreenTabs activeTab={activeTab} onChange={setActiveTab} />
           <CriteriaSummary markets={markets} filters={filters} />
           <p className="disclaimer">
-            Screening results are research candidates, not financial advice.
-            Data may be delayed, missing, or imported from CSV.
+            <span aria-hidden="true">ⓘ</span>
+            <span>
+              Screening results are research candidates, not financial advice.
+              Data may be delayed, missing, or imported from CSV.
+            </span>
           </p>
           {filtersChangedSinceScreen && !loading ? (
             <p className="pending-screen" role="status">
+              <span aria-hidden="true">⟳</span>
               Filters changed. Run screen to update results.
             </p>
           ) : null}
@@ -210,7 +228,8 @@ export default function HomePage() {
             stockName={selectedRow?.stockName ?? null}
           />
         </section>
-      </div>
-    </main>
+        </div>
+      </main>
+    </>
   );
 }

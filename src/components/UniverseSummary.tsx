@@ -12,19 +12,19 @@ export function UniverseSummary({
   return (
     <section className="universe-summary" aria-label="Stock universe summary">
       <div className="summary-item">
-        <span className="summary-value">{universeTotal}</span>
+        <span className="summary-value">{universeTotal.toLocaleString()}</span>
         <span className="summary-label">stocks in universe</span>
       </div>
-      <div className="summary-item">
-        <span className="summary-value">{matched}</span>
+      <div className="summary-item accent">
+        <span className="summary-value">{matched.toLocaleString()}</span>
         <span className="summary-label">matched</span>
       </div>
       <div className="summary-item">
-        <span className="summary-value">{filteredOut}</span>
+        <span className="summary-value">{filteredOut.toLocaleString()}</span>
         <span className="summary-label">filtered out</span>
       </div>
       <div className="summary-item">
-        <span className="summary-value">{markets.join(", ")}</span>
+        <span className="summary-value">{markets.join(", ") || "None"}</span>
         <span className="summary-label">selected markets</span>
       </div>
       <div className="summary-item">

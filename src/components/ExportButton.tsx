@@ -33,8 +33,8 @@ export function ExportButton({
   }
 
   return (
-    <button type="button" onClick={exportCsv}>
-      Export CSV
+    <button className="ghost-button" type="button" onClick={exportCsv}>
+      <span aria-hidden="true">↓</span> Export CSV
     </button>
   );
 }
