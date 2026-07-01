@@ -103,7 +103,8 @@ async function writeProviderData(
   source: string,
   now: Date,
 ): Promise<string[]> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(
+    async (tx) => {
     const warnings: string[] = [];
     const stock = await upsertStock(tx, data.row);
 
@@ -274,7 +275,9 @@ async function writeProviderData(
     }
 
     return warnings;
-  });
+    },
+    { maxWait: 15000, timeout: 60000 },
+  );
 }
 
 function errorMessage(error: unknown): string {

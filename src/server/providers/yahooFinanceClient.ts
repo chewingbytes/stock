@@ -1,6 +1,7 @@
 import YahooFinance from "yahoo-finance2";
 import type {
   MarketDataProvider,
+  ProviderAnnualDividend,
   ProviderAnnualFinancial,
   ProviderDailyPrice,
   ProviderMarketCap,
@@ -21,37 +22,36 @@ type YahooQuote = {
   currency?: unknown;
 };
 
-type YahooIncomeStatement = {
-  endDate?: unknown;
+// Annual rows returned by the fundamentals-timeseries endpoint. Keys mirror the
+// reported financial-statement line items (type prefix already stripped by the
+// library, e.g. `annualTotalRevenue` -> `totalRevenue`). Only the fields we map
+// are typed here; the endpoint returns many more.
+type YahooFundamentalsRow = {
+  date?: unknown;
   totalRevenue?: unknown;
-  incomeBeforeTax?: unknown;
+  pretaxIncome?: unknown;
   netIncome?: unknown;
-  ebit?: unknown;
-};
-
-type YahooBalanceSheet = {
-  endDate?: unknown;
+  EBITDA?: unknown;
+  EBIT?: unknown;
   totalDebt?: unknown;
-  totalStockholderEquity?: unknown;
   stockholdersEquity?: unknown;
+  commonStockEquity?: unknown;
   totalEquityGrossMinorityInterest?: unknown;
+  ordinarySharesNumber?: unknown;
+  shareIssued?: unknown;
+  basicAverageShares?: unknown;
+  basicEPS?: unknown;
+  dilutedEPS?: unknown;
 };
 
-type YahooQuoteSummary = {
-  incomeStatementHistory?: {
-    incomeStatementHistory?: YahooIncomeStatement[];
-  };
-  balanceSheetHistory?: {
-    balanceSheetStatements?: YahooBalanceSheet[];
-  };
-  defaultKeyStatistics?: {
-    sharesOutstanding?: unknown;
-    trailingEps?: unknown;
-    bookValue?: unknown;
-  };
-  summaryDetail?: {
-    dividendRate?: unknown;
-    currency?: unknown;
+type YahooDividendEvent = {
+  date?: unknown;
+  amount?: unknown;
+};
+
+type YahooChartResult = {
+  events?: {
+    dividends?: YahooDividendEvent[];
   };
 };
 
@@ -61,17 +61,24 @@ export type YahooFinanceClient = {
     options: { period1: Date; period2: Date; interval: "1d" },
   ): Promise<YahooHistoricalRow[]>;
   quote(symbol: string): Promise<YahooQuote>;
-  quoteSummary(
+  fundamentalsTimeSeries(
     symbol: string,
     options: {
-      modules: readonly [
-        "incomeStatementHistory",
-        "balanceSheetHistory",
-        "defaultKeyStatistics",
-        "summaryDetail",
-      ];
+      period1: Date;
+      period2: Date;
+      type: "annual";
+      module: "all";
     },
-  ): Promise<YahooQuoteSummary>;
+  ): Promise<YahooFundamentalsRow[]>;
+  chart(
+    symbol: string,
+    options: {
+      period1: Date;
+      period2: Date;
+      interval: "1d";
+      events: "dividends";
+    },
+  ): Promise<YahooChartResult>;
 };
 
 type YahooFinanceProviderDeps = {
@@ -80,26 +87,26 @@ type YahooFinanceProviderDeps = {
   now?: () => Date;
 };
 
-const quoteSummaryModules = [
-  // Yahoo Finance 3.14 warns these statement modules may have sparse data.
-  // Missing mapped statements are surfaced as no_annual_financials warnings.
-  "incomeStatementHistory",
-  "balanceSheetHistory",
-  "defaultKeyStatistics",
-  "summaryDetail",
-] as const;
+// How far back to request annual fundamentals and dividends. Growth metrics
+// need at least two fiscal years; five gives headroom for reporting gaps.
+const fundamentalsLookbackYears = 5;
 
 function createDefaultYahooClient(): YahooFinanceClient {
-  const client = new YahooFinance();
+  const client = new YahooFinance({
+    suppressNotices: ["ripHistorical", "yahooSurvey"],
+  });
 
   return {
     historical: async (symbol, options) =>
       (await client.historical(symbol, options)) as YahooHistoricalRow[],
     quote: async (symbol) => (await client.quote(symbol)) as YahooQuote,
-    quoteSummary: async (symbol, options) =>
-      (await client.quoteSummary(symbol, {
-        modules: [...options.modules],
-      })) as YahooQuoteSummary,
+    fundamentalsTimeSeries: async (symbol, options) =>
+      (await client.fundamentalsTimeSeries(
+        symbol,
+        options,
+      )) as YahooFundamentalsRow[],
+    chart: async (symbol, options) =>
+      (await client.chart(symbol, options)) as YahooChartResult,
   };
 }
 
@@ -108,14 +115,23 @@ function finiteNumber(value: unknown): number | null {
 }
 
 function dateValue(value: unknown): Date | null {
-  if (!(value instanceof Date) || Number.isNaN(value.getTime())) return null;
-  return value;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+  // The fundamentals endpoint can return a unix timestamp (seconds).
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return new Date(value * 1000);
+  }
+  return null;
 }
 
-function oneYearBefore(date: Date): Date {
-  const period1 = new Date(date);
-  period1.setUTCFullYear(period1.getUTCFullYear() - 1);
-  return period1;
+function yearOf(value: unknown): number | null {
+  const date = dateValue(value);
+  return date ? date.getUTCFullYear() : null;
+}
+
+function subtractYears(date: Date, years: number): Date {
+  const result = new Date(date);
+  result.setUTCFullYear(result.getUTCFullYear() - years);
+  return result;
 }
 
 function mapDailyPrice(row: YahooHistoricalRow): ProviderDailyPrice | null {
@@ -140,66 +156,76 @@ function mapDailyPrice(row: YahooHistoricalRow): ProviderDailyPrice | null {
   };
 }
 
-function fiscalYearFrom(statement?: { endDate?: unknown }): number | null {
-  const endDate = dateValue(statement?.endDate);
-  return endDate ? endDate.getUTCFullYear() : null;
-}
-
-function latestByFiscalYear<T extends { endDate?: unknown }>(
-  statements: T[] | undefined,
-): T | undefined {
-  return statements
-    ?.filter((statement) => fiscalYearFrom(statement) !== null)
-    .sort((left, right) => {
-      return (fiscalYearFrom(right) ?? 0) - (fiscalYearFrom(left) ?? 0);
-    })[0];
-}
-
-function findByFiscalYear<T extends { endDate?: unknown }>(
-  statements: T[] | undefined,
-  fiscalYear: number,
-): T | undefined {
-  return statements?.find(
-    (statement) => fiscalYearFrom(statement) === fiscalYear,
-  );
-}
-
 function mapAnnualFinancial(
-  summary: YahooQuoteSummary,
+  row: YahooFundamentalsRow,
 ): ProviderAnnualFinancial | null {
-  const incomeStatements =
-    summary.incomeStatementHistory?.incomeStatementHistory;
-  const balanceStatements = summary.balanceSheetHistory?.balanceSheetStatements;
-  const latestIncome = latestByFiscalYear(
-    incomeStatements,
-  );
-  const latestBalance = latestByFiscalYear(
-    balanceStatements,
-  );
-  const fiscalYear = fiscalYearFrom(latestIncome) ?? fiscalYearFrom(latestBalance);
-
+  const fiscalYear = yearOf(row.date);
   if (fiscalYear === null) return null;
 
-  const matchingIncome = findByFiscalYear(incomeStatements, fiscalYear);
-  const matchingBalance = findByFiscalYear(balanceStatements, fiscalYear);
+  const revenue = finiteNumber(row.totalRevenue);
+  const profitAfterTax = finiteNumber(row.netIncome);
+  const totalEquity =
+    finiteNumber(row.stockholdersEquity) ??
+    finiteNumber(row.commonStockEquity) ??
+    finiteNumber(row.totalEquityGrossMinorityInterest);
+  const sharesOutstanding =
+    finiteNumber(row.ordinarySharesNumber) ??
+    finiteNumber(row.shareIssued) ??
+    finiteNumber(row.basicAverageShares);
+
+  // Fundamentals pad the series with empty boundary periods; skip rows that
+  // carry no usable statement data.
+  if (revenue === null && profitAfterTax === null && totalEquity === null) {
+    return null;
+  }
+
+  const earningsPerShare =
+    finiteNumber(row.basicEPS) ??
+    finiteNumber(row.dilutedEPS) ??
+    (profitAfterTax !== null && sharesOutstanding !== null && sharesOutstanding > 0
+      ? profitAfterTax / sharesOutstanding
+      : null);
+  const bookValuePerShare =
+    totalEquity !== null && sharesOutstanding !== null && sharesOutstanding > 0
+      ? totalEquity / sharesOutstanding
+      : null;
 
   return {
     fiscalYear,
-    revenue: finiteNumber(matchingIncome?.totalRevenue),
-    profitBeforeTax: finiteNumber(matchingIncome?.incomeBeforeTax),
-    profitAfterTax: finiteNumber(matchingIncome?.netIncome),
-    ebita: finiteNumber(matchingIncome?.ebit),
-    totalDebt: finiteNumber(matchingBalance?.totalDebt),
-    totalEquity:
-      finiteNumber(matchingBalance?.totalStockholderEquity) ??
-      finiteNumber(matchingBalance?.stockholdersEquity) ??
-      finiteNumber(matchingBalance?.totalEquityGrossMinorityInterest),
-    sharesOutstanding: finiteNumber(
-      summary.defaultKeyStatistics?.sharesOutstanding,
-    ),
-    earningsPerShare: finiteNumber(summary.defaultKeyStatistics?.trailingEps),
-    bookValuePerShare: finiteNumber(summary.defaultKeyStatistics?.bookValue),
+    revenue,
+    profitBeforeTax: finiteNumber(row.pretaxIncome),
+    profitAfterTax,
+    ebita: finiteNumber(row.EBITDA) ?? finiteNumber(row.EBIT),
+    totalDebt: finiteNumber(row.totalDebt),
+    totalEquity,
+    sharesOutstanding,
+    earningsPerShare,
+    bookValuePerShare,
   };
+}
+
+// Sum individual dividend payments into a per-fiscal-year total so the screener
+// can compute a year-over-year dividend growth rate.
+function mapAnnualDividends(
+  events: YahooDividendEvent[],
+  currency: string,
+): ProviderAnnualDividend[] {
+  const totalsByYear = new Map<number, number>();
+
+  for (const event of events) {
+    const fiscalYear = yearOf(event.date);
+    const amount = finiteNumber(event.amount);
+    if (fiscalYear === null || amount === null) continue;
+    totalsByYear.set(fiscalYear, (totalsByYear.get(fiscalYear) ?? 0) + amount);
+  }
+
+  return [...totalsByYear.entries()]
+    .sort(([left], [right]) => left - right)
+    .map(([fiscalYear, dividendPerShare]) => ({
+      fiscalYear,
+      dividendPerShare,
+      currency,
+    }));
 }
 
 function mapMarketCap(quote: YahooQuote, now: Date, fallbackCurrency: string) {
@@ -210,7 +236,8 @@ function mapMarketCap(quote: YahooQuote, now: Date, fallbackCurrency: string) {
     {
       date: now,
       marketCap,
-      currency: typeof quote.currency === "string" ? quote.currency : fallbackCurrency,
+      currency:
+        typeof quote.currency === "string" ? quote.currency : fallbackCurrency,
       calculationMethod: "reported",
     } satisfies ProviderMarketCap,
   ];
@@ -239,59 +266,71 @@ export function createYahooFinanceProvider(
     source: "yahoo_finance",
     async fetchStock(row) {
       const now = getNow();
+      const priceStart = subtractYears(now, 1);
+      const fundamentalsStart = subtractYears(now, fundamentalsLookbackYears);
       const warnings: string[] = [];
+
       const [historicalRows, quote] = await Promise.all([
         yahoo.historical(row.providerSymbol, {
-          period1: oneYearBefore(now),
+          period1: priceStart,
           period2: now,
           interval: "1d",
         }),
         yahoo.quote(row.providerSymbol),
       ]);
-      let quoteSummary: YahooQuoteSummary = {};
 
+      let fundamentalsRows: YahooFundamentalsRow[] = [];
       try {
-        quoteSummary = await yahoo.quoteSummary(row.providerSymbol, {
-          modules: quoteSummaryModules,
-        });
+        fundamentalsRows = await yahoo.fundamentalsTimeSeries(
+          row.providerSymbol,
+          {
+            period1: fundamentalsStart,
+            period2: now,
+            type: "annual",
+            module: "all",
+          },
+        );
       } catch {
-        warnings.push("quote_summary_failed");
+        warnings.push("fundamentals_failed");
+      }
+
+      let dividendEvents: YahooDividendEvent[] = [];
+      try {
+        const chart = await yahoo.chart(row.providerSymbol, {
+          period1: fundamentalsStart,
+          period2: now,
+          interval: "1d",
+          events: "dividends",
+        });
+        dividendEvents = chart.events?.dividends ?? [];
+      } catch {
+        warnings.push("dividends_failed");
       }
 
       const dailyPrices = historicalRows
         .map((historicalRow) => mapDailyPrice(historicalRow))
         .filter((dailyPrice): dailyPrice is ProviderDailyPrice => dailyPrice !== null);
-      const annualFinancial = mapAnnualFinancial(quoteSummary);
-      const annualFinancials = annualFinancial ? [annualFinancial] : [];
-      const dividendRate = finiteNumber(quoteSummary.summaryDetail?.dividendRate);
+      const annualFinancials = fundamentalsRows
+        .map((fundamentalsRow) => mapAnnualFinancial(fundamentalsRow))
+        .filter(
+          (financial): financial is ProviderAnnualFinancial => financial !== null,
+        )
+        .sort((left, right) => left.fiscalYear - right.fiscalYear);
+      const annualDividends = mapAnnualDividends(dividendEvents, row.currency);
 
       if (dailyPrices.length === 0) warnings.push("no_daily_prices");
       if (annualFinancials.length === 0) warnings.push("no_annual_financials");
-      if (
-        annualFinancials.some((financial) =>
-          annualFinancialIsIncomplete(financial),
-        )
-      ) {
+      if (annualFinancials.length === 1) warnings.push("insufficient_financial_history");
+      if (annualFinancials.some(annualFinancialIsIncomplete)) {
         warnings.push("annual_financials_incomplete");
       }
+      if (annualDividends.length === 0) warnings.push("no_dividends");
 
       return {
         row,
         dailyPrices,
         annualFinancials,
-        annualDividends:
-          dividendRate === null
-            ? []
-            : [
-                {
-                  fiscalYear: now.getUTCFullYear(),
-                  dividendPerShare: dividendRate,
-                  currency:
-                    typeof quoteSummary.summaryDetail?.currency === "string"
-                      ? quoteSummary.summaryDetail.currency
-                      : row.currency,
-                },
-              ],
+        annualDividends,
         marketCaps: mapMarketCap(quote, now, row.currency),
         warnings,
       };
