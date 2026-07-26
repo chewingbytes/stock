@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AccountMenu } from "../components/AccountMenu";
 import { CriteriaSummary } from "../components/CriteriaSummary";
 import { ExportButton } from "../components/ExportButton";
 import { FilterBuilder } from "../components/FilterBuilder";
@@ -151,7 +152,10 @@ export default function HomePage() {
             <span className="brand-tag">Equity research</span>
           </span>
         </div>
-        <ExportButton markets={markets} filters={filters} />
+        <div className="app-bar-actions">
+          <ExportButton markets={markets} filters={filters} />
+          <AccountMenu />
+        </div>
       </div>
 
       <main className="app-shell">
