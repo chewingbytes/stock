@@ -18,3 +18,6 @@ test-results/
 .env.local
 .env*.local
 
+
+# TypeScript incremental build artifact
+tsconfig.tsbuildinfo

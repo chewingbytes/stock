@@ -4,10 +4,14 @@ name: Refresh stock data
 # the derived metrics the screener reads. Runs on a schedule and can be triggered
 # manually from the Actions tab.
 #
-# Setup (one time): add a repository secret named DATABASE_URL set to the Neon
-# **direct / non-pooler** connection string (Settings -> Secrets and variables ->
-# Actions). The direct connection is required because the importer uses
-# interactive transactions, which the pooled (pgBouncer) endpoint cannot hold.
+# Setup (one time): add a repository secret named DIRECT_DATABASE_URL set to the
+# Neon **direct / non-pooler** connection string — the host WITHOUT '-pooler' in
+# it (Settings -> Secrets and variables -> Actions). The direct connection is
+# required because the importer uses interactive transactions, which the pooled
+# (pgBouncer) endpoint cannot hold.
+#
+# Paste ONLY the connection string as the secret's value: it must start with
+# 'postgresql://' and must NOT include a leading 'DIRECT_DATABASE_URL=' prefix.
 
 on:
   schedule:
@@ -26,7 +30,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      # Direct (non-pooler) connection: required for the importer's interactive
+      # transactions. Falls back to DATABASE_URL if only that secret is set.
+      DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL || secrets.DATABASE_URL }}
+      # `prisma generate` resolves env("DATABASE_URL") from schema.prisma, so it
+      # must be present even though the client connects via DIRECT_DATABASE_URL.
+      DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL || secrets.DATABASE_URL }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -37,6 +46,28 @@ jobs:
           # yahoo-finance2 requires Node >= 22.
           node-version: 22
           cache: npm
+
+      # Catch a missing or malformed secret before spending 41 provider calls.
+      - name: Verify database secret
+        run: |
+          if [ -z "$DIRECT_DATABASE_URL" ]; then
+            echo "::error::No database secret set. Add DIRECT_DATABASE_URL under Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+          case "$DIRECT_DATABASE_URL" in
+            postgres://*|postgresql://*) ;;
+            *)
+              echo "::error::Secret value must start with postgresql:// — paste only the connection string, with no 'DIRECT_DATABASE_URL=' prefix."
+              exit 1
+              ;;
+          esac
+          case "$DIRECT_DATABASE_URL" in
+            *-pooler.*)
+              echo "::error::Secret points at the pooled endpoint. Use the Neon direct connection string (host without '-pooler')."
+              exit 1
+              ;;
+          esac
+          echo "Database secret looks valid."
 
       - name: Install dependencies
         run: npm ci
