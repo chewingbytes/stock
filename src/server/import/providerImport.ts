@@ -98,6 +98,46 @@ async function upsertStock(db: ProviderImportDb, row: ProviderUniverseRow) {
   });
 }
 
+/**
+ * Splits incoming rows into those we may write and those already owned by a
+ * different source (which we must not overwrite).
+ *
+ * `keyOf` maps a row to the value of its unique column (a date's epoch millis
+ * or a fiscal year) so incoming and existing rows can be compared.
+ */
+function partitionBySource<TIncoming, TExisting>(
+  incoming: TIncoming[],
+  existing: TExisting[],
+  keyOf: (row: TIncoming) => number,
+  existingKeyOf: (row: TExisting) => number,
+  existingSourceOf: (row: TExisting) => string,
+  source: string,
+): { writable: TIncoming[]; skipped: number } {
+  const ownedByOther = new Set(
+    existing
+      .filter((row) => existingSourceOf(row) !== source)
+      .map((row) => existingKeyOf(row)),
+  );
+
+  const writable = incoming.filter((row) => !ownedByOther.has(keyOf(row)));
+
+  return { writable, skipped: incoming.length - writable.length };
+}
+
+/**
+ * Writes one stock's provider data.
+ *
+ * Deliberately batched: an earlier version issued a findUnique + upsert per row
+ * (~520 sequential round trips for a year of daily bars), which comfortably
+ * exceeded the interactive-transaction timeout whenever the runner was far from
+ * the database — the scheduled refresh failed this way from GitHub's US runners
+ * against a Singapore database. Each collection now costs three queries
+ * (read existing, delete same-source rows, bulk insert), so a stock is ~13
+ * round trips regardless of how many bars it has.
+ *
+ * Delete-then-insert is equivalent to upserting here because nothing
+ * references these rows by id.
+ */
 async function writeProviderData(
   data: ProviderStockData,
   source: string,
@@ -105,176 +145,175 @@ async function writeProviderData(
 ): Promise<string[]> {
   return prisma.$transaction(
     async (tx) => {
-    const warnings: string[] = [];
-    const stock = await upsertStock(tx, data.row);
+      const warnings: string[] = [];
+      const stock = await upsertStock(tx, data.row);
 
-    for (const dailyPrice of data.dailyPrices) {
-      const existing = await tx.dailyPrice.findUnique({
-        where: {
-          stockId_date: {
+      if (data.dailyPrices.length > 0) {
+        const existing = await tx.dailyPrice.findMany({
+          where: {
             stockId: stock.id,
-            date: dailyPrice.date,
+            date: { in: data.dailyPrices.map((price) => price.date) },
           },
-        },
-      });
+          select: { date: true, source: true },
+        });
 
-      if (existing && existing.source !== source) {
-        warnings.push("skipped_existing_daily_price");
-        continue;
+        const { writable, skipped } = partitionBySource(
+          data.dailyPrices,
+          existing,
+          (price) => price.date.getTime(),
+          (row) => row.date.getTime(),
+          (row) => row.source,
+          source,
+        );
+
+        if (skipped > 0) warnings.push("skipped_existing_daily_price");
+
+        if (writable.length > 0) {
+          await tx.dailyPrice.deleteMany({
+            where: {
+              stockId: stock.id,
+              date: { in: writable.map((price) => price.date) },
+              source,
+            },
+          });
+
+          await tx.dailyPrice.createMany({
+            data: writable.map((price) => ({
+              stockId: stock.id,
+              date: price.date,
+              open: price.open,
+              high: price.high,
+              low: price.low,
+              close: price.close,
+              adjustedClose: price.adjustedClose,
+              volume: price.volume,
+              source,
+              fetchedAt: now,
+            })),
+          });
+        }
       }
 
-      await tx.dailyPrice.upsert({
-        where: {
-          stockId_date: {
+      if (data.annualFinancials.length > 0) {
+        const existing = await tx.annualFinancial.findMany({
+          where: {
             stockId: stock.id,
-            date: dailyPrice.date,
+            fiscalYear: {
+              in: data.annualFinancials.map((item) => item.fiscalYear),
+            },
           },
-        },
-        update: {
-          open: dailyPrice.open,
-          high: dailyPrice.high,
-          low: dailyPrice.low,
-          close: dailyPrice.close,
-          adjustedClose: dailyPrice.adjustedClose,
-          volume: dailyPrice.volume,
-          source,
-          fetchedAt: now,
-        },
-        create: {
-          stockId: stock.id,
-          date: dailyPrice.date,
-          open: dailyPrice.open,
-          high: dailyPrice.high,
-          low: dailyPrice.low,
-          close: dailyPrice.close,
-          adjustedClose: dailyPrice.adjustedClose,
-          volume: dailyPrice.volume,
-          source,
-          fetchedAt: now,
-        },
-      });
-    }
+          select: { fiscalYear: true, source: true },
+        });
 
-    for (const financial of data.annualFinancials) {
-      const existing = await tx.annualFinancial.findUnique({
-        where: {
-          stockId_fiscalYear: {
-            stockId: stock.id,
-            fiscalYear: financial.fiscalYear,
-          },
-        },
-      });
+        const { writable, skipped } = partitionBySource(
+          data.annualFinancials,
+          existing,
+          (item) => item.fiscalYear,
+          (row) => row.fiscalYear,
+          (row) => row.source,
+          source,
+        );
 
-      if (existing && existing.source !== source) {
-        warnings.push("skipped_existing_annual_financial");
-        continue;
+        if (skipped > 0) warnings.push("skipped_existing_annual_financial");
+
+        if (writable.length > 0) {
+          await tx.annualFinancial.deleteMany({
+            where: {
+              stockId: stock.id,
+              fiscalYear: { in: writable.map((item) => item.fiscalYear) },
+              source,
+            },
+          });
+
+          await tx.annualFinancial.createMany({
+            data: writable.map((item) => ({
+              stockId: stock.id,
+              fiscalYear: item.fiscalYear,
+              revenue: item.revenue,
+              profitBeforeTax: item.profitBeforeTax,
+              profitAfterTax: item.profitAfterTax,
+              ebita: item.ebita,
+              totalDebt: item.totalDebt,
+              totalEquity: item.totalEquity,
+              sharesOutstanding: item.sharesOutstanding,
+              earningsPerShare: item.earningsPerShare,
+              bookValuePerShare: item.bookValuePerShare,
+              source,
+              fetchedAt: now,
+            })),
+          });
+        }
       }
 
-      await tx.annualFinancial.upsert({
-        where: {
-          stockId_fiscalYear: {
+      if (data.annualDividends.length > 0) {
+        const existing = await tx.annualDividend.findMany({
+          where: {
             stockId: stock.id,
-            fiscalYear: financial.fiscalYear,
+            fiscalYear: {
+              in: data.annualDividends.map((item) => item.fiscalYear),
+            },
           },
-        },
-        update: {
-          revenue: financial.revenue,
-          profitBeforeTax: financial.profitBeforeTax,
-          profitAfterTax: financial.profitAfterTax,
-          ebita: financial.ebita,
-          totalDebt: financial.totalDebt,
-          totalEquity: financial.totalEquity,
-          sharesOutstanding: financial.sharesOutstanding,
-          earningsPerShare: financial.earningsPerShare,
-          bookValuePerShare: financial.bookValuePerShare,
-          source,
-          fetchedAt: now,
-        },
-        create: {
-          stockId: stock.id,
-          fiscalYear: financial.fiscalYear,
-          revenue: financial.revenue,
-          profitBeforeTax: financial.profitBeforeTax,
-          profitAfterTax: financial.profitAfterTax,
-          ebita: financial.ebita,
-          totalDebt: financial.totalDebt,
-          totalEquity: financial.totalEquity,
-          sharesOutstanding: financial.sharesOutstanding,
-          earningsPerShare: financial.earningsPerShare,
-          bookValuePerShare: financial.bookValuePerShare,
-          source,
-          fetchedAt: now,
-        },
-      });
-    }
+          select: { fiscalYear: true, source: true },
+        });
 
-    for (const dividend of data.annualDividends) {
-      const existing = await tx.annualDividend.findUnique({
-        where: {
-          stockId_fiscalYear: {
-            stockId: stock.id,
-            fiscalYear: dividend.fiscalYear,
-          },
-        },
-      });
+        const { writable, skipped } = partitionBySource(
+          data.annualDividends,
+          existing,
+          (item) => item.fiscalYear,
+          (row) => row.fiscalYear,
+          (row) => row.source,
+          source,
+        );
 
-      if (existing && existing.source !== source) {
-        warnings.push("skipped_existing_annual_dividend");
-        continue;
+        if (skipped > 0) warnings.push("skipped_existing_annual_dividend");
+
+        if (writable.length > 0) {
+          await tx.annualDividend.deleteMany({
+            where: {
+              stockId: stock.id,
+              fiscalYear: { in: writable.map((item) => item.fiscalYear) },
+              source,
+            },
+          });
+
+          await tx.annualDividend.createMany({
+            data: writable.map((item) => ({
+              stockId: stock.id,
+              fiscalYear: item.fiscalYear,
+              dividendPerShare: item.dividendPerShare,
+              currency: item.currency,
+              source,
+              fetchedAt: now,
+            })),
+          });
+        }
       }
 
-      await tx.annualDividend.upsert({
-        where: {
-          stockId_fiscalYear: {
+      if (data.marketCaps.length > 0) {
+        // The unique key already includes source, so there is nothing another
+        // source could own; replace this source's rows outright.
+        await tx.marketCap.deleteMany({
+          where: {
             stockId: stock.id,
-            fiscalYear: dividend.fiscalYear,
-          },
-        },
-        update: {
-          dividendPerShare: dividend.dividendPerShare,
-          currency: dividend.currency,
-          source,
-          fetchedAt: now,
-        },
-        create: {
-          stockId: stock.id,
-          fiscalYear: dividend.fiscalYear,
-          dividendPerShare: dividend.dividendPerShare,
-          currency: dividend.currency,
-          source,
-          fetchedAt: now,
-        },
-      });
-    }
-
-    for (const marketCap of data.marketCaps) {
-      await tx.marketCap.upsert({
-        where: {
-          stockId_date_source: {
-            stockId: stock.id,
-            date: marketCap.date,
+            date: { in: data.marketCaps.map((item) => item.date) },
             source,
           },
-        },
-        update: {
-          marketCap: marketCap.marketCap,
-          currency: marketCap.currency,
-          calculationMethod: marketCap.calculationMethod,
-          fetchedAt: now,
-        },
-        create: {
-          stockId: stock.id,
-          date: marketCap.date,
-          marketCap: marketCap.marketCap,
-          currency: marketCap.currency,
-          source,
-          calculationMethod: marketCap.calculationMethod,
-          fetchedAt: now,
-        },
-      });
-    }
+        });
 
-    return warnings;
+        await tx.marketCap.createMany({
+          data: data.marketCaps.map((item) => ({
+            stockId: stock.id,
+            date: item.date,
+            marketCap: item.marketCap,
+            currency: item.currency,
+            source,
+            calculationMethod: item.calculationMethod,
+            fetchedAt: now,
+          })),
+        });
+      }
+
+      return warnings;
     },
     { maxWait: 15000, timeout: 60000 },
   );
