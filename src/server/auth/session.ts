@@ -11,6 +11,7 @@ export type SessionUser = {
   id: string;
   email: string;
   name: string | null;
+  role?: "USER" | "ADMIN";
 };
 
 /**
@@ -51,11 +52,20 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
     const claims = await verifySessionToken(token);
     const user = await prisma.user.findUnique({
       where: { id: claims.sub },
-      select: { id: true, email: true, name: true },
+      select: { id: true, email: true, name: true, role: true },
     });
 
     return user;
   } catch {
     return null;
   }
+}
+
+/**
+ * Resolves the current user and asserts they are an admin.
+ * Returns null when not signed in or not an admin, so callers can 401/403.
+ */
+export async function requireAdmin(): Promise<SessionUser | null> {
+  const user = await getCurrentUser();
+  return user?.role === "ADMIN" ? user : null;
 }

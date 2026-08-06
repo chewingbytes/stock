@@ -122,7 +122,61 @@ export const beginnerMetricDefinitions: Record<
     caution: "Price alone does not show whether a stock is cheap or expensive.",
     defaultRange: { min: null, max: null },
   },
+  volume: {
+    metricKey: "volume",
+    label: "Volume",
+    shortLabel: "Volume",
+    explanation: "How many shares changed hands on the latest trading day.",
+    example: "Higher volume usually means the stock is easier to buy and sell.",
+    caution: "Volume spikes often follow news and can be short-lived.",
+    defaultRange: { min: null, max: null },
+  },
+  week52_high: {
+    metricKey: "week52_high",
+    label: "52W High",
+    shortLabel: "52W High",
+    explanation: "The highest price traded over the past 52 weeks.",
+    example: "A price near the 52-week high shows recent strength.",
+    caution: "A new high does not guarantee the trend continues.",
+    defaultRange: { min: null, max: null },
+  },
+  week52_low: {
+    metricKey: "week52_low",
+    label: "52W Low",
+    shortLabel: "52W Low",
+    explanation: "The lowest price traded over the past 52 weeks.",
+    example: "A price near the 52-week low may signal value or ongoing trouble.",
+    caution: "Cheap versus the 52-week low is not the same as undervalued.",
+    defaultRange: { min: null, max: null },
+  },
 };
+
+/**
+ * Columns always shown in results and exports, regardless of active filters.
+ * These are the headline figures users expect to see for any stock.
+ */
+export const coreDisplayMetrics: MetricKey[] = [
+  "close",
+  "market_cap",
+  "pe_ratio",
+  "dividend_yield",
+  "week52_high",
+  "week52_low",
+  "volume",
+];
+
+/**
+ * Core columns first, then any filtered metrics not already covered, so the
+ * table and CSV share one column order.
+ */
+export function buildDisplayMetricKeys(
+  filteredKeys: readonly MetricKey[],
+): MetricKey[] {
+  return [
+    ...coreDisplayMetrics,
+    ...filteredKeys.filter((key) => !coreDisplayMetrics.includes(key)),
+  ];
+}
 
 export function getMetricDefinition(metricKey: MetricKey) {
   return beginnerMetricDefinitions[metricKey];

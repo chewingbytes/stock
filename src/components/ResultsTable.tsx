@@ -1,5 +1,6 @@
 import { DataQualityBadge } from "./DataQualityBadge";
 import { formatMetricLabel } from "../domain/metricDefinitions";
+import { formatMetricValue } from "../domain/formatMetric";
 import type { MetricKey } from "../domain/types";
 
 type ScreenMetricValue = {
@@ -21,6 +22,7 @@ type ScreenRow = {
 export function ResultsTable({
   rows,
   metricKeys,
+  filteredKeys = [],
   totalCount,
   selectedRowKey = null,
   onSelectRow,
@@ -29,12 +31,16 @@ export function ResultsTable({
 }: {
   rows: ScreenRow[];
   metricKeys: MetricKey[];
+  /** Subset of metricKeys the user is actively filtering on; marked in the header. */
+  filteredKeys?: MetricKey[];
   totalCount?: number;
   selectedRowKey?: string | null;
   onSelectRow?: (rowKey: string) => void;
   emptyMessage?: string;
   title?: string;
 }) {
+  const filteredSet = new Set(filteredKeys);
+
   return (
     <section className="panel table-panel">
       <div className="table-panel-title">
@@ -56,7 +62,20 @@ export function ResultsTable({
               <th>Company</th>
               <th>Currency</th>
               {metricKeys.map((key) => (
-                <th key={key}>{formatMetricLabel(key)}</th>
+                <th
+                  className={filteredSet.has(key) ? "metric-th filtered" : "metric-th"}
+                  key={key}
+                  scope="col"
+                >
+                  {formatMetricLabel(key)}
+                  {/* Decorative: active filters are announced by CriteriaSummary,
+                      so keep the column's accessible name clean. */}
+                  {filteredSet.has(key) ? (
+                    <span className="filter-dot" title="Active filter" aria-hidden="true">
+                      ●
+                    </span>
+                  ) : null}
+                </th>
               ))}
             </tr>
           </thead>
@@ -88,15 +107,13 @@ export function ResultsTable({
                       const metric = row.metrics[key];
 
                       return (
-                        <td key={key}>
-                          {metric?.value === null || metric?.value === undefined
-                            ? "N/A"
-                            : metric.value.toLocaleString()}
-                          {metric ? (
-                            <DataQualityBadge status={metric.dataQuality} />
-                          ) : (
-                            <DataQualityBadge status="missing" />
-                          )}
+                        <td className="metric-cell" key={key}>
+                          <span className="metric-value">
+                            {formatMetricValue(key, metric?.value)}
+                          </span>
+                          <DataQualityBadge
+                            status={metric?.dataQuality ?? "missing"}
+                          />
                         </td>
                       );
                     })}

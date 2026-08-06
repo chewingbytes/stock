@@ -1072,3 +1072,90 @@ td .stock-code {
     display: none;
   }
 }
+
+/* -------------------------------------------------------------------------
+   Admin (user management)
+   ------------------------------------------------------------------------- */
+
+.admin-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.admin-create-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  align-items: end;
+}
+
+.admin-create-form select {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 400;
+}
+
+.admin-create-form .primary {
+  width: auto;
+  white-space: nowrap;
+}
+
+.admin-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.danger-button {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.danger-button:hover:not(:disabled) {
+  background: var(--danger-soft);
+}
+
+.danger-button:disabled {
+  border-color: var(--border);
+  color: var(--muted);
+  opacity: 0.6;
+}
+
+/* Results table: numeric cells and active-filter markers */
+
+.metric-cell {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.metric-th {
+  text-align: right;
+}
+
+.metric-value {
+  font-weight: 600;
+}
+
+.filter-dot {
+  margin-left: 5px;
+  color: var(--primary);
+  font-size: 9px;
+  vertical-align: middle;
+}
+
+@media (max-width: 640px) {
+  .admin-create-form {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-actions {
+    flex-direction: column;
+  }
+}

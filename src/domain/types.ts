@@ -30,7 +30,10 @@ export type MetricKey =
   | "open"
   | "high"
   | "low"
-  | "close";
+  | "close"
+  | "volume"
+  | "week52_high"
+  | "week52_low";
 
 export type RangeFilter = {
   metricKey: MetricKey;

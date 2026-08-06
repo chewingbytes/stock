@@ -19,7 +19,9 @@
     "db:seed": "tsx prisma/seed.ts",
     "import:fixtures": "tsx src/server/import/runFixtureImport.ts",
     "import:yahoo": "tsx src/server/import/runYahooFinanceImport.ts",
-    "metrics:recompute": "tsx src/server/metrics/runRecomputeMetrics.ts"
+    "metrics:recompute": "tsx src/server/metrics/runRecomputeMetrics.ts",
+    "admin:set": "tsx scripts/setAdmin.ts",
+    "db:clean-test-data": "tsx scripts/cleanTestData.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

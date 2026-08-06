@@ -11,6 +11,7 @@ import { ResultsTable } from "../components/ResultsTable";
 import { RowExplanation } from "../components/RowExplanation";
 import { ScreenTabs, type ScreenTab } from "../components/ScreenTabs";
 import { UniverseSummary } from "../components/UniverseSummary";
+import { buildDisplayMetricKeys } from "../domain/metricDefinitions";
 import type { RangeFilter } from "../domain/types";
 
 type ScreenResult = {
@@ -64,6 +65,13 @@ export default function HomePage() {
   const metricKeys = useMemo(
     () => filters.map((filter) => filter.metricKey),
     [filters],
+  );
+
+  // Core headline columns are always shown, with any extra filtered metrics
+  // appended, so results stay informative no matter which filters are active.
+  const displayMetricKeys = useMemo(
+    () => buildDisplayMetricKeys(metricKeys),
+    [metricKeys],
   );
 
   const screenSignature = useMemo(
@@ -217,7 +225,12 @@ export default function HomePage() {
                     ? "No stocks are available for the selected markets."
                     : "No stocks matched these ranges. Try widening one filter."
               }
-              metricKeys={activeTab === "universe" ? [] : metricKeys}
+              metricKeys={
+                activeTab === "universe"
+                  ? buildDisplayMetricKeys([])
+                  : displayMetricKeys
+              }
+              filteredKeys={activeTab === "universe" ? [] : metricKeys}
               onSelectRow={setSelectedRowKey}
               rows={
                 activeTab === "universe"

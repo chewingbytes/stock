@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
+import {expect, it} from "vitest";
+import { describeDb } from "../../test/dbTest";
 import { prisma } from "../db";
 import { importFixtures } from "../import/fixtureImport";
 import { recomputeMetrics } from "./recomputeMetrics";
 
-describe("recomputeMetrics", () => {
+describeDb("recomputeMetrics", () => {
   it("creates complete and unavailable derived metrics", async () => {
     await importFixtures();
 

@@ -14,6 +14,9 @@ export const metricKeys = [
   "high",
   "low",
   "close",
+  "volume",
+  "week52_high",
+  "week52_low",
 ] as const satisfies readonly MetricKey[];
 
 const rangeFilterSchema = z.object({

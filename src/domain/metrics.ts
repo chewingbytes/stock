@@ -171,6 +171,35 @@ export function calculatePbRatio(input: {
   return complete(closePrice / bookValuePerShare);
 }
 
+/**
+ * Highest intraday high across the supplied window (caller passes the trailing
+ * 52 weeks of daily bars).
+ */
+export function calculate52WeekHigh(input: {
+  highs: Array<number | null | undefined>;
+}): MetricResult {
+  const highs = input.highs.filter(
+    (value): value is number => typeof value === "number" && Number.isFinite(value),
+  );
+
+  if (highs.length === 0) return missing("no_price_history");
+
+  return complete(Math.max(...highs));
+}
+
+/** Lowest intraday low across the supplied window. */
+export function calculate52WeekLow(input: {
+  lows: Array<number | null | undefined>;
+}): MetricResult {
+  const lows = input.lows.filter(
+    (value): value is number => typeof value === "number" && Number.isFinite(value),
+  );
+
+  if (lows.length === 0) return missing("no_price_history");
+
+  return complete(Math.min(...lows));
+}
+
 export function calculateDebtToEquity(input: {
   totalDebt: number | null | undefined;
   totalEquity: number | null | undefined;

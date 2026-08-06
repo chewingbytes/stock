@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../server/db";
 import { hashPassword } from "../../../../server/auth/password";
+import {
+  checkRateLimit,
+  getClientKey,
+} from "../../../../server/auth/rateLimit";
 import { createSession } from "../../../../server/auth/session";
 import { registerSchema } from "../../../../server/auth/validation";
 
@@ -8,6 +12,19 @@ import { registerSchema } from "../../../../server/auth/validation";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  // Throttle bulk account creation from the same client.
+  const limit = checkRateLimit(getClientKey(request, "register"), {
+    limit: 5,
+    windowSeconds: 3600,
+  });
+
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "Too many accounts created. Please try again later." },
+      { status: 429, headers: { "retry-after": String(limit.retryAfterSeconds) } },
+    );
+  }
+
   const json = await request.json().catch(() => null);
   const parsed = registerSchema.safeParse(json);
 

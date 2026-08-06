@@ -21,8 +21,9 @@ async function isAuthenticated(request: NextRequest): Promise<boolean> {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Auth endpoints handle their own logic and must stay open.
-  if (pathname.startsWith("/api/auth")) {
+  // Auth endpoints handle their own logic; the health probe must stay
+  // reachable by uptime monitors. Both bypass the session gate.
+  if (pathname.startsWith("/api/auth") || pathname === "/api/health") {
     return NextResponse.next();
   }
 

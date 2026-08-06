@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
+import {expect, it} from "vitest";
+import { describeDb } from "../../test/dbTest";
 import { importFixtures } from "../import/fixtureImport";
 import { recomputeMetrics } from "../metrics/recomputeMetrics";
 import { runScreen } from "./screenerService";
 
-describe("runScreen", () => {
+describeDb("runScreen", () => {
   it("filters US stocks by P/E range", async () => {
     await importFixtures();
     await recomputeMetrics();

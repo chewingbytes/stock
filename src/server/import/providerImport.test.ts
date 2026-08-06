@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import {beforeEach, expect, it} from "vitest";
+import { describeDb } from "../../test/dbTest";
 import { prisma } from "../db";
 import type { MarketDataProvider, ProviderUniverseRow } from "../providers/types";
 import { importFixtures } from "./fixtureImport";
@@ -23,7 +24,7 @@ function rowFor(
   };
 }
 
-describe("importProviderUniverse", () => {
+describeDb("importProviderUniverse", () => {
   const providerOnlyDate = new Date("2035-01-01T00:00:00.000Z");
   const providerOnlyFiscalYear = 2035;
 

@@ -1,11 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 export function AccountMenu() {
   const router = useRouter();
   const [email, setEmail] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
@@ -13,9 +15,10 @@ export function AccountMenu() {
 
     fetch("/api/auth/me")
       .then((response) => response.json())
-      .then((data: { user?: { email?: string } | null }) => {
+      .then((data: { user?: { email?: string; role?: string } | null }) => {
         if (active) {
           setEmail(data.user?.email ?? null);
+          setIsAdmin(data.user?.role === "ADMIN");
         }
       })
       .catch(() => {
@@ -44,6 +47,11 @@ export function AccountMenu() {
         <span className="account-email" title={email}>
           {email}
         </span>
+      ) : null}
+      {isAdmin ? (
+        <Link className="secondary-button" href="/admin">
+          Admin
+        </Link>
       ) : null}
       <button
         className="secondary-button"

@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../server/db";
 import { verifyPassword } from "../../../../server/auth/password";
+import {
+  checkRateLimit,
+  getClientKey,
+} from "../../../../server/auth/rateLimit";
 import { createSession } from "../../../../server/auth/session";
 import { credentialsSchema } from "../../../../server/auth/validation";
 
@@ -8,6 +12,19 @@ import { credentialsSchema } from "../../../../server/auth/validation";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  // Throttle repeated sign-in attempts from the same client.
+  const limit = checkRateLimit(getClientKey(request, "login"), {
+    limit: 10,
+    windowSeconds: 300,
+  });
+
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "Too many sign-in attempts. Please try again shortly." },
+      { status: 429, headers: { "retry-after": String(limit.retryAfterSeconds) } },
+    );
+  }
+
   const json = await request.json().catch(() => null);
   const parsed = credentialsSchema.safeParse(json);
 

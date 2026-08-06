@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  calculate52WeekHigh,
+  calculate52WeekLow,
   calculateDebtToEquity,
   calculateDividendGrowthRate,
   calculateDividendYield,
@@ -118,6 +120,31 @@ describe("metric formulas", () => {
     expect(calculateDebtToEquity({ totalDebt: 40, totalEquity: 100 })).toEqual({
       status: "complete",
       value: 0.4,
+    });
+  });
+
+  it("calculates the 52-week high from the price window", () => {
+    expect(calculate52WeekHigh({ highs: [10, 42.5, 31, 8] })).toEqual({
+      status: "complete",
+      value: 42.5,
+    });
+  });
+
+  it("calculates the 52-week low, ignoring gaps in the window", () => {
+    expect(calculate52WeekLow({ lows: [10, null, 6.25, undefined, 31] })).toEqual({
+      status: "complete",
+      value: 6.25,
+    });
+  });
+
+  it("marks the 52-week range missing when there is no price history", () => {
+    expect(calculate52WeekHigh({ highs: [] })).toEqual({
+      status: "missing",
+      reason: "no_price_history",
+    });
+    expect(calculate52WeekLow({ lows: [null] })).toEqual({
+      status: "missing",
+      reason: "no_price_history",
     });
   });
 });

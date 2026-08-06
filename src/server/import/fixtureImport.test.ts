@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import {expect, it} from "vitest";
+import { describeDb } from "../../test/dbTest";
 import { importFixtures } from "./fixtureImport";
 
-describe("importFixtures", () => {
+describeDb("importFixtures", () => {
   it("imports the deterministic stock universe", async () => {
     const summary = await importFixtures();
 

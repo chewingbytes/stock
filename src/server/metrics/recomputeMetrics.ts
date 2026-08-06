@@ -1,4 +1,6 @@
 import {
+  calculate52WeekHigh,
+  calculate52WeekLow,
   calculateDebtToEquity,
   calculateDividendGrowthRate,
   calculateDividendYield,
@@ -73,7 +75,9 @@ async function writeMetric(input: {
 export async function recomputeMetrics(): Promise<RecomputeSummary> {
   const stocks = await prisma.stock.findMany({
     include: {
-      dailyPrices: { orderBy: { date: "desc" }, take: 1 },
+      // A trading year is ~252 sessions; 400 bounds the query while leaving
+      // headroom to cover a full 52 weeks of bars for the range metrics.
+      dailyPrices: { orderBy: { date: "desc" }, take: 400 },
       financials: { orderBy: { fiscalYear: "desc" }, take: 2 },
       dividends: { orderBy: { fiscalYear: "desc" }, take: 2 },
     },
@@ -90,6 +94,15 @@ export async function recomputeMetrics(): Promise<RecomputeSummary> {
     const metricDate = latestPrice?.date;
     const fiscalYear = latestFinancial?.fiscalYear;
     const closePrice = toNumber(latestPrice?.close);
+
+    // Window the 52-week range on the latest bar we actually hold, so stocks
+    // with stale history still report a range instead of dropping out.
+    const windowStart = latestPrice
+      ? new Date(latestPrice.date.getTime() - 365 * 24 * 60 * 60 * 1000)
+      : null;
+    const window52Weeks = windowStart
+      ? stock.dailyPrices.filter((price) => price.date >= windowStart)
+      : [];
 
     const metricInputs = [
       {
@@ -181,6 +194,28 @@ export async function recomputeMetrics(): Promise<RecomputeSummary> {
           totalEquity: toNumber(latestFinancial?.totalEquity),
         },
       },
+      {
+        metricKey: "week52_high",
+        result: calculate52WeekHigh({
+          highs: window52Weeks.map((price) => toNumber(price.high)),
+        }),
+        currency: stock.currency,
+        inputSnapshot: {
+          sessions: window52Weeks.length,
+          windowStart: windowStart?.toISOString() ?? null,
+        },
+      },
+      {
+        metricKey: "week52_low",
+        result: calculate52WeekLow({
+          lows: window52Weeks.map((price) => toNumber(price.low)),
+        }),
+        currency: stock.currency,
+        inputSnapshot: {
+          sessions: window52Weeks.length,
+          windowStart: windowStart?.toISOString() ?? null,
+        },
+      },
     ];
 
     for (const item of metricInputs) {
@@ -202,6 +237,7 @@ export async function recomputeMetrics(): Promise<RecomputeSummary> {
         high: toNumber(latestPrice.high),
         low: toNumber(latestPrice.low),
         close: toNumber(latestPrice.close),
+        volume: toNumber(latestPrice.volume),
       };
 
       for (const [metricKey, value] of Object.entries(ohlcValues)) {
@@ -209,7 +245,8 @@ export async function recomputeMetrics(): Promise<RecomputeSummary> {
           stockId: stock.id,
           metricKey,
           metricDate,
-          currency: stock.currency,
+          // Volume is a share count, not a monetary amount.
+          currency: metricKey === "volume" ? undefined : stock.currency,
           result:
             value === null
               ? { status: "missing", reason: `${metricKey}_missing` }
