@@ -15,9 +15,18 @@ name: Refresh stock data
 
 on:
   schedule:
-    # 22:00 UTC on weekdays — after the US market close (and the same day's SGX
-    # close). Cron in GitHub Actions is always UTC.
+    # Cron in GitHub Actions is always UTC. Both entries are timed to land after
+    # a market close, so each captures a settled end-of-day price.
+    #
+    # 22:00 UTC Mon-Fri = ~06:00 SGT Tue-Sat (the day shifts, since 22:00 UTC is
+    # already past midnight in Singapore). Runs ~1-2h after the US close and
+    # picks up that day's US session.
     - cron: "0 22 * * 1-5"
+    # 10:00 UTC Mon-Fri = 18:00 SGT Mon-Fri (no day shift). Runs 1h after the
+    # SGX close so Singapore prices land the same evening instead of waiting
+    # until the next morning. No US session has traded yet at this hour, so US
+    # rows are simply re-written unchanged.
+    - cron: "0 10 * * 1-5"
   workflow_dispatch: {}
 
 # Never let two refreshes run at once.
